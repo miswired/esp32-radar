@@ -1,0 +1,24 @@
+# Arduino build artifacts
+*.elf
+*.bin
+*.hex
+*.map
+build/
+
+# IDE files
+.vscode/
+*.code-workspace
+
+# macOS
+.DS_Store
+
+# Compiled libraries
+libraries/
+
+# Backup files
+*~
+*.bak
+*.swp
+
+# Claude Code
+.claude/
