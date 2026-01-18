@@ -4,6 +4,7 @@
  * This stage implements:
  * - GPIO communication with RCWL-0516 microwave radar sensor
  * - Motion detection polling at 10Hz
+ * - Trip delay feature (motion must be sustained before alarm triggers)
  * - State change detection with timestamps
  * - Serial output for debugging
  * - Built-in self-tests
@@ -27,6 +28,12 @@
  * - Detection Angle: 360° omnidirectional
  * - Output: 3.3V HIGH when motion detected, LOW otherwise
  * - Trigger Duration: ~2-3 seconds (retriggerable)
+ *
+ * Motion Detection Logic:
+ * 1. Raw sensor reading (HIGH/LOW)
+ * 2. Trip delay: Motion must be sustained for TRIP_DELAY_SECONDS before alarm
+ * 3. Alarm state: Triggers notifications (in later stages)
+ * 4. Clear timeout: No motion for CLEAR_TIMEOUT_SECONDS clears alarm
  */
 
 #include <rom/rtc.h>  // For reset reason detection
@@ -40,17 +47,51 @@
 #define HEAP_PRINT_INTERVAL 30000  // Print heap every 30 seconds
 #define HEAP_MIN_THRESHOLD 100000  // 100KB minimum free heap
 
-// Motion state tracking
-#define MOTION_TIMEOUT 5000  // Consider motion stopped after 5 seconds of no detection
+// ============================================================================
+// MOTION DETECTION CONFIGURATION
+// These values will be configurable via web interface in later stages
+// ============================================================================
+
+// Trip Delay: Motion must be sustained for this many seconds before alarm triggers
+// This prevents false alarms from brief movements (pets, curtains, HVAC)
+#define TRIP_DELAY_SECONDS 3
+
+// Clear Timeout: No motion for this many seconds clears the alarm
+#define CLEAR_TIMEOUT_SECONDS 30
+
+// Convert to milliseconds for internal use
+#define TRIP_DELAY_MS (TRIP_DELAY_SECONDS * 1000)
+#define CLEAR_TIMEOUT_MS (CLEAR_TIMEOUT_SECONDS * 1000)
+
+// ============================================================================
+// STATE MACHINE DEFINITIONS
+// ============================================================================
+
+enum MotionState {
+  STATE_IDLE,           // No motion detected
+  STATE_MOTION_PENDING, // Motion detected, waiting for trip delay
+  STATE_ALARM_ACTIVE,   // Alarm triggered, notifications sent
+  STATE_ALARM_CLEARING  // Motion stopped, waiting for clear timeout
+};
+
+// State names for display
+const char* stateNames[] = {
+  "IDLE",
+  "MOTION_PENDING",
+  "ALARM_ACTIVE",
+  "ALARM_CLEARING"
+};
 
 // Global state variables
 unsigned long lastSensorRead = 0;
 unsigned long lastHeapPrint = 0;
-unsigned long lastMotionTime = 0;
-bool motionDetected = false;
-bool motionActive = false;  // Sustained motion state
-unsigned long motionStartTime = 0;
-unsigned long totalMotionEvents = 0;
+bool rawMotionDetected = false;        // Current sensor reading
+MotionState currentState = STATE_IDLE; // State machine state
+unsigned long motionStartTime = 0;     // When motion first detected
+unsigned long motionStopTime = 0;      // When motion last stopped
+unsigned long alarmTriggerTime = 0;    // When alarm was triggered
+unsigned long totalAlarmEvents = 0;    // Count of alarm triggers
+unsigned long totalMotionEvents = 0;   // Count of raw motion events
 
 // ============================================================================
 // RESET REASON DETECTION
@@ -86,25 +127,130 @@ void printResetReason() {
 }
 
 // ============================================================================
+// STATE MACHINE
+// ============================================================================
+
+/**
+ * Process the motion state machine
+ * Called every sensor poll interval
+ */
+void processMotionState(bool motionDetected, unsigned long currentMillis) {
+  MotionState previousState = currentState;
+
+  switch (currentState) {
+    case STATE_IDLE:
+      if (motionDetected) {
+        // Motion started - begin trip delay countdown
+        currentState = STATE_MOTION_PENDING;
+        motionStartTime = currentMillis;
+        totalMotionEvents++;
+
+        Serial.print("[");
+        Serial.print(currentMillis / 1000);
+        Serial.print("s] Motion detected - waiting ");
+        Serial.print(TRIP_DELAY_SECONDS);
+        Serial.println("s for trip delay...");
+      }
+      break;
+
+    case STATE_MOTION_PENDING:
+      if (!motionDetected) {
+        // Motion stopped before trip delay - return to idle
+        currentState = STATE_IDLE;
+
+        Serial.print("[");
+        Serial.print(currentMillis / 1000);
+        Serial.println("s] Motion stopped before trip delay - returning to IDLE");
+      } else if (currentMillis - motionStartTime >= TRIP_DELAY_MS) {
+        // Trip delay elapsed with sustained motion - TRIGGER ALARM
+        currentState = STATE_ALARM_ACTIVE;
+        alarmTriggerTime = currentMillis;
+        totalAlarmEvents++;
+
+        Serial.println();
+        Serial.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        Serial.print("[");
+        Serial.print(currentMillis / 1000);
+        Serial.print("s] *** ALARM TRIGGERED *** (#");
+        Serial.print(totalAlarmEvents);
+        Serial.println(")");
+        Serial.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        Serial.println();
+
+        // In later stages, this is where notifications would be sent
+      }
+      break;
+
+    case STATE_ALARM_ACTIVE:
+      if (!motionDetected) {
+        // Motion stopped - begin clear timeout countdown
+        currentState = STATE_ALARM_CLEARING;
+        motionStopTime = currentMillis;
+
+        Serial.print("[");
+        Serial.print(currentMillis / 1000);
+        Serial.print("s] Motion stopped - alarm will clear in ");
+        Serial.print(CLEAR_TIMEOUT_SECONDS);
+        Serial.println("s if no motion...");
+      }
+      break;
+
+    case STATE_ALARM_CLEARING:
+      if (motionDetected) {
+        // Motion resumed - back to alarm active
+        currentState = STATE_ALARM_ACTIVE;
+
+        Serial.print("[");
+        Serial.print(currentMillis / 1000);
+        Serial.println("s] Motion resumed - alarm still active");
+      } else if (currentMillis - motionStopTime >= CLEAR_TIMEOUT_MS) {
+        // Clear timeout elapsed - alarm cleared
+        currentState = STATE_IDLE;
+
+        unsigned long alarmDuration = (currentMillis - alarmTriggerTime) / 1000;
+        Serial.println();
+        Serial.print("[");
+        Serial.print(currentMillis / 1000);
+        Serial.print("s] *** ALARM CLEARED *** (was active for ");
+        Serial.print(alarmDuration);
+        Serial.println("s)");
+        Serial.println();
+
+        // In later stages, this is where "alarm cleared" notification would be sent
+      }
+      break;
+  }
+
+  // Update LED based on state
+  // LED ON = alarm active or clearing, LED OFF = idle or pending
+  bool ledState = (currentState == STATE_ALARM_ACTIVE || currentState == STATE_ALARM_CLEARING);
+  digitalWrite(LED_PIN, ledState ? HIGH : LOW);
+
+  // Log state transitions
+  if (currentState != previousState) {
+    Serial.print("       State: ");
+    Serial.print(stateNames[previousState]);
+    Serial.print(" -> ");
+    Serial.println(stateNames[currentState]);
+    Serial.flush();
+  }
+}
+
+// ============================================================================
 // SELF-TEST FUNCTIONS
 // ============================================================================
 
 /**
  * Test GPIO pin configuration
- * Returns: true if GPIO is configured correctly
  */
 bool testGPIOConfiguration() {
   Serial.print("  GPIO Configuration (pin ");
   Serial.print(SENSOR_PIN);
   Serial.print("): ");
 
-  // Verify pin is set as input
   pinMode(SENSOR_PIN, INPUT);
-
-  // Read the pin to verify it's accessible
   int reading = digitalRead(SENSOR_PIN);
 
-  // Pin should read either HIGH or LOW (0 or 1)
   if (reading == HIGH || reading == LOW) {
     Serial.print("PASS (current: ");
     Serial.print(reading == HIGH ? "HIGH" : "LOW");
@@ -118,7 +264,6 @@ bool testGPIOConfiguration() {
 
 /**
  * Test LED pin configuration
- * Returns: true if LED can be controlled
  */
 bool testLEDConfiguration() {
   Serial.print("  LED Configuration (pin ");
@@ -126,8 +271,6 @@ bool testLEDConfiguration() {
   Serial.print("): ");
 
   pinMode(LED_PIN, OUTPUT);
-
-  // Blink LED briefly to verify
   digitalWrite(LED_PIN, HIGH);
   delay(100);
   digitalWrite(LED_PIN, LOW);
@@ -137,8 +280,7 @@ bool testLEDConfiguration() {
 }
 
 /**
- * Test sensor response (checks if sensor output changes or is stable)
- * Returns: true (always passes - we're just reading the current state)
+ * Test sensor response
  */
 bool testSensorReading() {
   Serial.print("  Sensor Reading: ");
@@ -154,7 +296,6 @@ bool testSensorReading() {
 
 /**
  * Test heap memory availability
- * Returns: true if heap is above minimum threshold
  */
 bool testHeapMemory() {
   uint32_t freeHeap = ESP.getFreeHeap();
@@ -169,7 +310,7 @@ bool testHeapMemory() {
 }
 
 /**
- * Run all self-tests and report results
+ * Run all self-tests
  */
 void runSelfTest() {
   Serial.println("\n=== STAGE 1 SELF TEST ===");
@@ -196,27 +337,59 @@ void runSelfTest() {
 }
 
 /**
- * Print current sensor and motion statistics
+ * Print current configuration
+ */
+void printConfig() {
+  Serial.println("\n=== CURRENT CONFIGURATION ===");
+  Serial.print("Sensor Pin: GPIO ");
+  Serial.println(SENSOR_PIN);
+  Serial.print("LED Pin: GPIO ");
+  Serial.println(LED_PIN);
+  Serial.print("Trip Delay: ");
+  Serial.print(TRIP_DELAY_SECONDS);
+  Serial.println(" seconds");
+  Serial.print("Clear Timeout: ");
+  Serial.print(CLEAR_TIMEOUT_SECONDS);
+  Serial.println(" seconds");
+  Serial.print("Poll Interval: ");
+  Serial.print(SENSOR_POLL_INTERVAL);
+  Serial.println(" ms");
+  Serial.println("=============================\n");
+}
+
+/**
+ * Print motion statistics
  */
 void printStats() {
   Serial.println("\n=== MOTION STATISTICS ===");
-  Serial.print("Total Motion Events: ");
-  Serial.println(totalMotionEvents);
   Serial.print("Current State: ");
-  Serial.println(motionActive ? "MOTION ACTIVE" : "NO MOTION");
+  Serial.println(stateNames[currentState]);
+  Serial.print("Raw Motion Events: ");
+  Serial.println(totalMotionEvents);
+  Serial.print("Alarm Triggers: ");
+  Serial.println(totalAlarmEvents);
 
-  if (motionActive && motionStartTime > 0) {
-    Serial.print("Current Motion Duration: ");
-    Serial.print((millis() - motionStartTime) / 1000);
+  if (currentState == STATE_MOTION_PENDING && motionStartTime > 0) {
+    unsigned long elapsed = (millis() - motionStartTime) / 1000;
+    unsigned long remaining = TRIP_DELAY_SECONDS - elapsed;
+    Serial.print("Trip Delay Remaining: ");
+    Serial.print(remaining);
     Serial.println(" seconds");
   }
 
-  if (lastMotionTime > 0) {
-    Serial.print("Last Motion: ");
-    Serial.print((millis() - lastMotionTime) / 1000);
-    Serial.println(" seconds ago");
-  } else {
-    Serial.println("Last Motion: Never");
+  if (currentState == STATE_ALARM_ACTIVE && alarmTriggerTime > 0) {
+    unsigned long duration = (millis() - alarmTriggerTime) / 1000;
+    Serial.print("Alarm Active For: ");
+    Serial.print(duration);
+    Serial.println(" seconds");
+  }
+
+  if (currentState == STATE_ALARM_CLEARING && motionStopTime > 0) {
+    unsigned long elapsed = (millis() - motionStopTime) / 1000;
+    unsigned long remaining = CLEAR_TIMEOUT_SECONDS - elapsed;
+    Serial.print("Clear Timeout Remaining: ");
+    Serial.print(remaining);
+    Serial.println(" seconds");
   }
 
   Serial.print("Uptime: ");
@@ -226,7 +399,7 @@ void printStats() {
 }
 
 /**
- * Handle serial commands for interactive testing
+ * Handle serial commands
  */
 void handleSerialCommands() {
   if (Serial.available()) {
@@ -243,6 +416,7 @@ void handleSerialCommands() {
         Serial.println("\n=== SERIAL COMMANDS ===");
         Serial.println("t - Run self test");
         Serial.println("s - Print motion statistics");
+        Serial.println("c - Print current configuration");
         Serial.println("h - Show this help menu");
         Serial.println("r - Restart ESP32");
         Serial.println("i - Print system info");
@@ -253,6 +427,11 @@ void handleSerialCommands() {
       case 's':
       case 'S':
         printStats();
+        break;
+
+      case 'c':
+      case 'C':
+        printConfig();
         break;
 
       case 'r':
@@ -293,16 +472,11 @@ void handleSerialCommands() {
         Serial.print("Uptime: ");
         Serial.print(millis() / 1000);
         Serial.println(" seconds");
-        Serial.print("Sensor Pin: GPIO ");
-        Serial.println(SENSOR_PIN);
-        Serial.print("Motion Events: ");
-        Serial.println(totalMotionEvents);
         Serial.println("===================\n");
         break;
 
       case '\n':
       case '\r':
-        // Ignore newlines
         break;
 
       default:
@@ -317,10 +491,9 @@ void handleSerialCommands() {
 // ============================================================================
 
 void setup() {
-  // Initialize serial communication
   Serial.begin(115200);
-  while(!Serial);  // Wait for serial port to connect
-  delay(1000);     // Stabilization delay
+  while(!Serial);
+  delay(1000);
 
   Serial.println("\n\n");
   Serial.println("==========================================");
@@ -329,17 +502,15 @@ void setup() {
   Serial.println("Sensor: RCWL-0516 Microwave Radar");
   Serial.println();
 
-  // Print reset reason
   printResetReason();
   Serial.println();
 
-  // Initialize sensor pin as input
+  // Initialize pins
   pinMode(SENSOR_PIN, INPUT);
   Serial.print("Sensor pin configured (GPIO ");
   Serial.print(SENSOR_PIN);
   Serial.println(")");
 
-  // Initialize LED pin for visual feedback
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
   Serial.print("LED pin configured (GPIO ");
@@ -350,17 +521,29 @@ void setup() {
   Serial.println("Sensor specifications:");
   Serial.println("  - Detection range: 5-7 meters");
   Serial.println("  - Detection angle: 360 degrees");
-  Serial.println("  - Trigger duration: ~2-3 seconds");
   Serial.println("  - Output: HIGH when motion detected");
   Serial.println();
 
-  // Run self-test automatically on boot
+  // Print configuration
+  printConfig();
+
+  Serial.println("Motion Detection Logic:");
+  Serial.print("  1. Motion must be sustained for ");
+  Serial.print(TRIP_DELAY_SECONDS);
+  Serial.println("s to trigger alarm");
+  Serial.print("  2. No motion for ");
+  Serial.print(CLEAR_TIMEOUT_SECONDS);
+  Serial.println("s clears the alarm");
+  Serial.println();
+
+  // Run self-test
   runSelfTest();
 
   Serial.println("Type 'h' for help menu");
   Serial.println("Type 's' for motion statistics");
+  Serial.println("Type 'c' for current configuration");
   Serial.println();
-  Serial.println("Starting motion detection at 10Hz...");
+  Serial.println("Starting motion detection...");
   Serial.println("------------------------------------------");
 }
 
@@ -369,76 +552,19 @@ void setup() {
 // ============================================================================
 
 void loop() {
-  // Handle serial commands
   handleSerialCommands();
 
-  // Poll sensor at configured interval
   unsigned long currentMillis = millis();
 
+  // Poll sensor at configured interval
   if (currentMillis - lastSensorRead >= SENSOR_POLL_INTERVAL) {
     lastSensorRead = currentMillis;
 
     // Read sensor state
-    bool currentReading = (digitalRead(SENSOR_PIN) == HIGH);
+    rawMotionDetected = (digitalRead(SENSOR_PIN) == HIGH);
 
-    // Update LED to match sensor state
-    digitalWrite(LED_PIN, currentReading ? HIGH : LOW);
-
-    // Detect state changes
-    if (currentReading && !motionDetected) {
-      // Motion just started
-      motionDetected = true;
-      lastMotionTime = currentMillis;
-
-      if (!motionActive) {
-        // New motion event
-        motionActive = true;
-        motionStartTime = currentMillis;
-        totalMotionEvents++;
-
-        Serial.print("[");
-        Serial.print(currentMillis / 1000);
-        Serial.print("s] MOTION DETECTED (#");
-        Serial.print(totalMotionEvents);
-        Serial.println(")");
-        Serial.flush();
-      }
-    } else if (currentReading && motionDetected) {
-      // Motion continues
-      lastMotionTime = currentMillis;
-    } else if (!currentReading && motionDetected) {
-      // Sensor went LOW, but might retrigger
-      motionDetected = false;
-    }
-
-    // Check for motion timeout (sustained no-motion)
-    if (motionActive && !motionDetected &&
-        (currentMillis - lastMotionTime >= MOTION_TIMEOUT)) {
-      motionActive = false;
-
-      unsigned long duration = (lastMotionTime - motionStartTime) / 1000;
-      Serial.print("[");
-      Serial.print(currentMillis / 1000);
-      Serial.print("s] MOTION STOPPED (duration: ");
-      Serial.print(duration);
-      Serial.println("s)");
-      Serial.flush();
-
-      motionStartTime = 0;
-    }
-
-    // Periodic status output (every 10 seconds when motion active)
-    static unsigned long lastStatusPrint = 0;
-    if (motionActive && (currentMillis - lastStatusPrint >= 10000)) {
-      lastStatusPrint = currentMillis;
-      unsigned long duration = (currentMillis - motionStartTime) / 1000;
-      Serial.print("[");
-      Serial.print(currentMillis / 1000);
-      Serial.print("s] Motion active for ");
-      Serial.print(duration);
-      Serial.println("s...");
-      Serial.flush();
-    }
+    // Process state machine
+    processMotionState(rawMotionDetected, currentMillis);
   }
 
   // Print heap status periodically
@@ -448,9 +574,10 @@ void loop() {
     uint32_t freeHeap = ESP.getFreeHeap();
     Serial.print("[HEAP] Free: ");
     Serial.print(freeHeap);
-    Serial.print(" bytes (");
-    Serial.print((freeHeap * 100) / ESP.getHeapSize());
-    Serial.println("%)");
+    Serial.print(" bytes | State: ");
+    Serial.print(stateNames[currentState]);
+    Serial.print(" | Alarms: ");
+    Serial.println(totalAlarmEvents);
     Serial.flush();
 
     if (freeHeap < HEAP_MIN_THRESHOLD) {
@@ -459,6 +586,5 @@ void loop() {
     }
   }
 
-  // Small delay to prevent tight loop
   delay(10);
 }

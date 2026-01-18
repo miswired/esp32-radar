@@ -88,6 +88,21 @@ See `archive/c4001_sensor/ARCHIVE_README.md` for details on why the sensor was c
 - **No library needed**: Standard Arduino GPIO functions work
 - **No configuration required**: Sensor works out of the box
 
+### Motion Detection Logic
+The system implements a multi-stage detection pipeline:
+
+1. **Raw Detection**: GPIO reads sensor state (HIGH = motion, LOW = no motion)
+2. **Trip Delay**: Motion must be sustained for configurable duration before alarm triggers
+3. **Alarm State**: Once tripped, system enters alarm state and sends notifications
+4. **Clear Timeout**: No motion for configurable duration clears the alarm
+
+**Trip Delay Feature**: Prevents false alarms from brief movements (e.g., pets, curtains, HVAC).
+Motion must be continuously detected for the configured trip delay before the alarm activates.
+
+**Configurable Parameters** (via web interface in later stages):
+- `tripDelay`: Seconds of sustained motion before alarm triggers (default: 3 seconds)
+- `clearTimeout`: Seconds of no motion before alarm clears (default: 30 seconds)
+
 ### Optional Hardware Modifications
 The RCWL-0516 has solder pads on the back for optional modifications:
 - **C-TM**: Add capacitor to extend trigger time (0.2µF = 50s, 1µF = 250s)

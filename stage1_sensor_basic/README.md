@@ -1,6 +1,10 @@
 # Stage 1: Basic Sensor Interface
 
-This stage implements basic GPIO communication with the RCWL-0516 microwave radar motion sensor, polling at 10Hz, state change detection, and serial output for debugging.
+This stage implements basic GPIO communication with the RCWL-0516 microwave radar motion sensor, including:
+- 10Hz polling
+- **Trip delay feature** (motion must be sustained before alarm triggers)
+- State machine for alarm management
+- Serial output for debugging
 
 ## Sensor: RCWL-0516 Microwave Radar
 
@@ -35,6 +39,51 @@ The RCWL-0516 is a Doppler radar motion sensor that operates at ~3.2 GHz. It pro
 - USB cable for programming
 
 **No pull-up resistors or external components needed!**
+
+## Motion Detection Logic
+
+The system implements a state machine to prevent false alarms:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│   IDLE ──motion──► MOTION_PENDING ──trip delay──► ALARM_ACTIVE │
+│     ▲                    │                              │       │
+│     │              no motion                      no motion     │
+│     │                    │                              │       │
+│     │                    ▼                              ▼       │
+│     └────────────── (return) ◄──────────────── ALARM_CLEARING  │
+│                                    clear timeout                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### States
+
+| State | Description | LED |
+|-------|-------------|-----|
+| `IDLE` | No motion detected | OFF |
+| `MOTION_PENDING` | Motion detected, waiting for trip delay | OFF |
+| `ALARM_ACTIVE` | Alarm triggered, notifications would be sent | **ON** |
+| `ALARM_CLEARING` | Motion stopped, waiting for clear timeout | **ON** |
+
+### Configuration Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `TRIP_DELAY_SECONDS` | 3 | Motion must be sustained this long before alarm triggers |
+| `CLEAR_TIMEOUT_SECONDS` | 30 | No motion for this long clears the alarm |
+
+These values will be configurable via web interface in later stages.
+
+### Why Trip Delay?
+
+The trip delay prevents false alarms from:
+- Brief movements (waving hand, walking past quickly)
+- Pets or small animals
+- Curtains or HVAC air movement
+- Sensor noise or interference
+
+Only sustained motion (person entering and staying) triggers the alarm.
 
 ## Wiring Connections
 
@@ -139,11 +188,24 @@ Starting motion detection at 10Hz...
 ### Motion Detection Output
 
 ```
-[5s] MOTION DETECTED (#1)
-[15s] Motion active for 10s...
-[23s] MOTION STOPPED (duration: 18s)
-[45s] MOTION DETECTED (#2)
-[52s] MOTION STOPPED (duration: 7s)
+[5s] Motion detected - waiting 3s for trip delay...
+       State: IDLE -> MOTION_PENDING
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+[8s] *** ALARM TRIGGERED *** (#1)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+       State: MOTION_PENDING -> ALARM_ACTIVE
+[15s] Motion stopped - alarm will clear in 30s if no motion...
+       State: ALARM_ACTIVE -> ALARM_CLEARING
+[20s] Motion resumed - alarm still active
+       State: ALARM_CLEARING -> ALARM_ACTIVE
+[25s] Motion stopped - alarm will clear in 30s if no motion...
+       State: ALARM_ACTIVE -> ALARM_CLEARING
+
+[55s] *** ALARM CLEARED *** (was active for 47s)
+
+       State: ALARM_CLEARING -> IDLE
 ```
 
 ## Serial Commands
