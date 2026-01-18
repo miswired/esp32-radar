@@ -22,12 +22,12 @@ See `archive/c4001_sensor/ARCHIVE_README.md` for details on why the sensor was c
 - **Communication**: Simple digital GPIO (no protocol required)
 - **Development**: Arduino IDE with ESP32 board support
 - **Programming Language**: C++ (Arduino framework)
-- **Web Interface**: ESP32 async web server (ESPAsyncWebServer library recommended)
+- **Web Interface**: ESP32 built-in WebServer library
 - **WiFi**: 2.4GHz 802.11 b/g/n
 - **Libraries**:
-  - WiFi.h (ESP32 WiFi)
-  - ESPAsyncWebServer.h (async web server)
-  - AsyncTCP.h (async networking)
+  - WiFi.h (ESP32 WiFi - built-in)
+  - WebServer.h (ESP32 web server - built-in)
+  - ArduinoJson.h (JSON serialization)
 
 ## Project Conventions
 
@@ -133,8 +133,8 @@ The RCWL-0516 has solder pads on the back for optional modifications:
 
 ### Required Arduino Libraries
 - **WiFi**: ESP32 WiFi (built-in ESP32 core)
-- **ESPAsyncWebServer**: Async web server ([GitHub](https://github.com/me-no-dev/ESPAsyncWebServer))
-- **AsyncTCP**: Async TCP library for ESP32 ([GitHub](https://github.com/me-no-dev/AsyncTCP))
+- **WebServer**: ESP32 web server (built-in ESP32 core)
+- **ArduinoJson**: JSON serialization library (install via `arduino-cli lib install "ArduinoJson"`)
 
 ### Documentation Resources
 - Random Nerd Tutorials: [ESP32 RCWL-0516 Guide](https://randomnerdtutorials.com/esp32-rcwl-0516-arduino/)
