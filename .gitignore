@@ -22,3 +22,7 @@ libraries/
 
 # Claude Code
 .claude/
+
+# Sensitive credentials - NEVER commit these
+**/credentials.h
+!**/credentials.h.example

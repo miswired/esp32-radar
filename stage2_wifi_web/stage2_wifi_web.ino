@@ -31,6 +31,7 @@
 #include <WebServer.h>
 #include <ArduinoJson.h>
 #include <rom/rtc.h>
+#include "credentials.h"  // WiFi credentials (copy credentials.h.example to credentials.h)
 
 // ============================================================================
 // PIN CONFIGURATION
@@ -59,11 +60,9 @@
 
 // ============================================================================
 // WIFI CONFIGURATION
-// Change these to match your network, or use AP mode for initial setup
+// WiFi credentials are loaded from credentials.h
+// Copy credentials.h.example to credentials.h and edit with your values
 // ============================================================================
-
-const char* WIFI_SSID = "YOUR_WIFI_SSID";      // Change this!
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASS";  // Change this!
 
 // AP Mode fallback settings
 const char* AP_SSID = "ESP32-Radar-Setup";

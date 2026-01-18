@@ -29,12 +29,25 @@ Same as Stage 1:
 
 ## Configuration
 
-**Before uploading**, edit these lines in the sketch:
+**Before uploading**, create your credentials file:
+
+```bash
+# Copy the example file
+cp credentials.h.example credentials.h
+
+# Edit with your WiFi credentials
+nano credentials.h
+```
+
+Edit `credentials.h` with your network settings:
 
 ```cpp
 const char* WIFI_SSID = "YOUR_WIFI_SSID";      // Your WiFi network name
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASS";  // Your WiFi password
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";  // Your WiFi password
 ```
+
+**Note:** `credentials.h` is in `.gitignore` and will never be committed to the repository.
+This keeps your WiFi credentials private when sharing the code.
 
 If you don't configure WiFi (or it fails to connect), the device will start in AP mode.
 
