@@ -1,70 +1,63 @@
 # Stage 1: Basic Sensor Interface
 
-This stage implements basic I2C communication with the DFRobot C4001 mmWave sensor, sensor polling at 1Hz, serial output for debugging, and built-in self-tests.
+This stage implements basic GPIO communication with the RCWL-0516 microwave radar motion sensor, polling at 10Hz, state change detection, and serial output for debugging.
 
-## ⚠️ CRITICAL: DIP SWITCH CONFIGURATION REQUIRED!
+## Sensor: RCWL-0516 Microwave Radar
 
-**Before connecting anything, configure the DIP switches on the sensor!**
+The RCWL-0516 is a Doppler radar motion sensor that operates at ~3.2 GHz. It provides a simple digital output:
+- **HIGH (3.3V)**: Motion detected
+- **LOW (0V)**: No motion
 
-The C4001 sensor has **2 DIP switches on the BACK** of the board that MUST be configured correctly:
+### Key Specifications
 
-### Switch 1: Communication Mode (I2C/UART)
-- **MUST be set to "I2C" position**
-- This is the **#1 cause of "NO Devices!" errors**
-- If in UART position, the sensor will NOT respond on I2C bus
+| Parameter | Value |
+|-----------|-------|
+| Operating Voltage | 4-28V (use 5V) |
+| Operating Frequency | ~3.18 GHz |
+| Detection Range | 5-7 meters |
+| Detection Angle | 360° omnidirectional |
+| Current Draw | ~2.7 mA |
+| Output Voltage | 3.3V TTL |
+| Trigger Duration | ~2-3 seconds |
 
-### Switch 2: Address Select (0x2A / 0x2B)
-- **Set to 0x2A position** (default)
-- Our code uses `SENSOR_I2C_ADDR = 0x2A`
-- Only change if using multiple sensors on same bus
+### Advantages
 
-**❌ Common mistake**: Leaving switch in UART mode → Sensor won't be detected
-**✅ Correct setup**: Both switches set to I2C mode at address 0x2A
+- **Simple interface**: Just a digital GPIO read - no protocols, no libraries needed
+- **Reliable**: No configuration to corrupt, no recovery tools needed
+- **Versatile**: Detects through walls, plastic, wood (non-metallic materials)
+- **Temperature independent**: Works in any environment (unlike PIR)
+- **Low cost**: ~$1-2 per sensor
 
 ## Hardware Requirements
 
 - ESP32-WROOM-32 development board
-- DFRobot SEN0610 C4001 mmWave sensor
-- 2x 4.7kΩ resistors (for I2C pull-ups)
-- Breadboard and jumper wires
+- RCWL-0516 Microwave Radar Motion Sensor
 - USB cable for programming
+
+**No pull-up resistors or external components needed!**
 
 ## Wiring Connections
 
-**⚠️ STEP 0: Configure DIP switches on sensor BEFORE wiring!**
-- Communication Mode switch → I2C position
-- Address Select switch → 0x2A position
-
-**CRITICAL**: The I2C pull-up resistors are REQUIRED for reliable communication.
-
 ```
-DFRobot C4001 Sensor → ESP32-WROOM-32
-────────────────────────────────────────
-VCC                  → 3.3V (or 5V)
-GND                  → GND
-SDA                  → GPIO 21 (with 4.7kΩ pull-up to 3.3V)
-SCL                  → GPIO 22 (with 4.7kΩ pull-up to 3.3V)
+RCWL-0516          ESP32
+---------          -----
+VIN            →   VIN (5V from USB)
+GND            →   GND
+OUT            →   GPIO 13
+3V3            →   DO NOT CONNECT (this is an output!)
+CDS            →   DO NOT CONNECT (optional LDR feature)
 ```
 
-**DIP Switches (on back of sensor):**
-- Switch 1: I2C (NOT UART)
-- Switch 2: 0x2A (default address)
+### Important Notes
 
-### Pull-up Resistor Installation
-
-Each I2C line (SDA and SCL) needs a 4.7kΩ resistor between the signal line and 3.3V:
-
-```
-3.3V ─┬─── 4.7kΩ ───┬─── SDA (GPIO 21) ─── Sensor SDA
-      │             │
-      └─── 4.7kΩ ───┴─── SCL (GPIO 22) ─── Sensor SCL
-```
+1. **Power**: Connect VIN to ESP32's VIN pin (5V), NOT to 3.3V. The sensor needs 4-28V.
+2. **3V3 Pin**: This is a regulated 3.3V OUTPUT from the sensor, not an input. Do not connect it.
+3. **Orientation**: The component side of the sensor should face the detection area. Keep the back clear of metal objects.
 
 ## Software Setup
 
 ### 1. Install Arduino IDE or CLI
 
-If using Arduino CLI (recommended for command-line builds):
 ```bash
 # Verify installation
 arduino-cli version
@@ -76,124 +69,96 @@ arduino-cli core update-index
 arduino-cli core install esp32:esp32
 ```
 
-### 2. Install Required Libraries
+### 2. No Additional Libraries Required
 
-```bash
-# Install DFRobot C4001 library
-arduino-cli lib install DFRobot_C4001
-```
+The RCWL-0516 uses standard Arduino GPIO functions - no external libraries needed!
 
-### 3. Verify Board Configuration
-
-In Arduino IDE:
-- **Board**: "ESP32 Dev Module" (or your specific ESP32 board)
-- **Upload Speed**: 115200
-- **CPU Frequency**: 240MHz
-- **Flash Frequency**: 80MHz
-- **Flash Mode**: QIO
-- **Flash Size**: 4MB
-- **Partition Scheme**: Default 4MB with spiffs (1.2MB APP/1.5MB SPIFFS)
-- **Port**: Select your ESP32's serial port
-
-## Compilation
+## Compilation and Upload
 
 ### Using Arduino CLI
 
 ```bash
-# Navigate to the stage1_sensor_basic directory
-cd stage1_sensor_basic
+# Navigate to project directory
+cd /home/miswired/Multiverse/esp32-radar
 
 # Compile the sketch
-arduino-cli compile --fqbn esp32:esp32:esp32 stage1_sensor_basic.ino
+arduino-cli compile --fqbn esp32:esp32:esp32 stage1_sensor_basic
 
-# Expected output:
-# Sketch uses 316471 bytes (24%) of program storage space.
-# Global variables use 22224 bytes (6%) of dynamic memory.
-```
+# Upload to ESP32 (adjust port if needed)
+arduino-cli upload --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 stage1_sensor_basic
 
-### Using Arduino IDE
-
-1. Open `stage1_sensor_basic.ino` in Arduino IDE
-2. Select the correct board and port (Tools menu)
-3. Click "Verify" button (checkmark icon)
-4. Ensure compilation completes with 0 errors and 0 warnings
-
-## Flashing to ESP32
-
-### Using Arduino CLI
-
-```bash
-# Flash the compiled sketch (replace PORT with your ESP32's port)
-arduino-cli upload --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 stage1_sensor_basic.ino
-
-# On Linux, common ports are: /dev/ttyUSB0, /dev/ttyUSB1, /dev/ttyACM0
-# On macOS: /dev/cu.usbserial-*
-# On Windows: COM3, COM4, etc.
-```
-
-### Using Arduino IDE
-
-1. Select the correct port (Tools → Port)
-2. Click "Upload" button (right arrow icon)
-3. Wait for "Done uploading" message
-
-## Testing and Verification
-
-### 1. Open Serial Monitor
-
-```bash
-# Using Arduino CLI
+# Monitor serial output
 arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200
-
-# Or use screen
-screen /dev/ttyUSB0 115200
-
-# Or using Arduino IDE: Tools → Serial Monitor (set to 115200 baud)
 ```
 
-### 2. Expected Boot Output
+### All-in-One Command
 
-After flashing, you should see:
+```bash
+arduino-cli compile --fqbn esp32:esp32:esp32 stage1_sensor_basic && \
+arduino-cli upload --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 stage1_sensor_basic && \
+arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200
+```
+
+## Expected Output
+
+### Boot Sequence
 
 ```
-========================================
-ESP32 mmWave Presence Sensor - Stage 1
-========================================
+==========================================
+ESP32 Microwave Motion Sensor - Stage 1
+==========================================
+Sensor: RCWL-0516 Microwave Radar
 
-I2C initialized (GPIO 21=SDA, GPIO 22=SCL)
-Initializing C4001 mmWave sensor...
-Sensor configured (Presence Detection Mode)
+Reset reason: POWERON_RESET - Power on reset
+
+Sensor pin configured (GPIO 13)
+LED pin configured (GPIO 2)
+
+Sensor specifications:
+  - Detection range: 5-7 meters
+  - Detection angle: 360 degrees
+  - Trigger duration: ~2-3 seconds
+  - Output: HIGH when motion detected
 
 === STAGE 1 SELF TEST ===
-  I2C Communication (addr 0x2A): PASS
-  Sensor Initialization: PASS
+  GPIO Configuration (pin 13): PASS (current: LOW)
+  LED Configuration (pin 2): PASS (blinked)
+  Sensor Reading: PASS (state: NO MOTION)
   Free Heap (305456 bytes): PASS
-  Sensor Reading: PASS
 
-Overall: ALL TESTS PASSED ✓
+Overall: ALL TESTS PASSED
 =========================
 
 Type 'h' for help menu
-Type 't' to re-run self-test
+Type 's' for motion statistics
 
-Starting sensor polling at 1Hz...
-----------------------------------------
-[1s] Presence: NO  | Motion: NONE
-[2s] Presence: NO  | Motion: NONE
-[3s] Presence: YES | Motion: DETECTED
-[4s] Presence: YES | Motion: DETECTED
+Starting motion detection at 10Hz...
+------------------------------------------
 ```
 
-### 3. Serial Commands
+### Motion Detection Output
 
-While the sensor is running, you can use these interactive commands:
+```
+[5s] MOTION DETECTED (#1)
+[15s] Motion active for 10s...
+[23s] MOTION STOPPED (duration: 18s)
+[45s] MOTION DETECTED (#2)
+[52s] MOTION STOPPED (duration: 7s)
+```
 
-- **t** - Run self-test again
-- **h** - Display help menu
-- **r** - Restart ESP32
-- **i** - Display system information
+## Serial Commands
 
-Example of 'i' command output:
+| Command | Description |
+|---------|-------------|
+| `t` | Run self-test |
+| `s` | Print motion statistics |
+| `h` | Show help menu |
+| `r` | Restart ESP32 |
+| `i` | Print system info |
+| `l` | Toggle LED manually |
+
+### Example: System Info (`i`)
+
 ```
 === SYSTEM INFO ===
 Free Heap: 305456 bytes
@@ -202,8 +167,20 @@ Chip Model: ESP32-D0WDQ6
 CPU Freq: 240 MHz
 Flash Size: 4194304 bytes
 Uptime: 127 seconds
-I2C Errors: 0
+Sensor Pin: GPIO 13
+Motion Events: 5
 ===================
+```
+
+### Example: Motion Statistics (`s`)
+
+```
+=== MOTION STATISTICS ===
+Total Motion Events: 5
+Current State: NO MOTION
+Last Motion: 23 seconds ago
+Uptime: 150 seconds
+=========================
 ```
 
 ## Acceptance Criteria
@@ -211,121 +188,101 @@ I2C Errors: 0
 Stage 1 is complete when:
 
 - [x] Sketch compiles with 0 errors and 0 warnings
-- [x] Sketch size < 80% of program memory (currently 24%)
-- [x] Free heap > 100KB (currently ~305KB)
-- [ ] **DIP switches configured correctly (I2C mode, 0x2A address)**
 - [x] ESP32 boots and runs self-test automatically
 - [ ] All self-tests report PASS
-- [ ] Sensor polling displays presence detection at 1Hz
-- [ ] Serial commands (t/h/r/i) work correctly
-- [ ] I2C error count remains at 0 during normal operation
+- [ ] Sensor detects motion when you move in front of it
+- [ ] LED lights up when motion is detected
+- [ ] Motion start/stop events are logged with timestamps
+- [ ] Serial commands (t/s/h/r/i/l) work correctly
+- [ ] Heap memory remains stable over time
 
 ## Troubleshooting
 
-### Issue: All self-tests fail "I2C Communication: FAIL"
+### Issue: Sensor always reads LOW (no motion detected)
 
-**Cause**: Sensor not detected on I2C bus
+**Possible causes:**
+1. Wiring issue - OUT pin not connected to GPIO 13
+2. Power issue - Sensor not receiving 5V on VIN
+3. Orientation - Component side not facing detection area
 
-**Solutions (check in this order)**:
-1. **⚠️ CHECK DIP SWITCHES FIRST!** - Communication mode MUST be set to I2C (not UART)
-2. Verify address select switch is set to 0x2A position
-3. Verify sensor is powered (VCC connected to 3.3V or 5V)
-4. Check GND connection
-5. Install 4.7kΩ pull-up resistors on SDA and SCL lines
-6. Verify wiring: GPIO 21 → SDA, GPIO 22 → SCL
-7. Test I2C bus with i2c_scanner sketch (in parent directory)
-8. Ensure sensor I2C address matches code (default 0x2A)
+**Solutions:**
+1. Verify OUT → GPIO 13 connection
+2. Verify VIN → ESP32 VIN (not 3.3V)
+3. Verify GND → ESP32 GND
+4. Check USB cable provides enough current
 
-### Issue: Self-test passes but sensor shows "I2C error count: X"
+### Issue: Sensor always reads HIGH (constant motion)
 
-**Cause**: Intermittent I2C communication failures
+**Possible causes:**
+1. Sensor detecting its own reflection from nearby metal
+2. Vibration causing false triggers
+3. Electrical noise
 
-**Solutions**:
-1. Add or replace pull-up resistors (must be 4.7kΩ)
-2. Shorten I2C wire length (keep under 20cm if possible)
-3. Check for loose connections
-4. Ensure 3.3V power supply is stable
+**Solutions:**
+1. Keep metal objects >1cm from back of sensor
+2. Mount sensor rigidly to prevent vibration
+3. Add 100nF capacitor between VIN and GND if needed
 
-### Issue: "Free Heap: FAIL" during self-test
+### Issue: Erratic readings
 
-**Cause**: Insufficient memory available
+**Possible causes:**
+1. Poor power supply
+2. Long wires picking up noise
+3. WiFi interference (unlikely at 3.2 GHz vs 2.4 GHz)
 
-**Solutions**:
-1. Restart ESP32 (type 'r' in serial monitor)
-2. Check for memory leaks in other code
-3. Reduce sketch complexity if modified
+**Solutions:**
+1. Use short wires (<20cm)
+2. Use a quality USB cable
+3. Add decoupling capacitor on power
 
-### Issue: Upload fails with "No serial data received"
+### Issue: Detection range seems short
 
-**Cause**: ESP32 not entering bootloader mode
+**Possible causes:**
+1. Obstructions in detection path
+2. Metal objects behind sensor reducing performance
 
-**Solutions**:
-1. Hold BOOT button on ESP32 while clicking Upload
-2. Verify correct port selected
-3. Check USB cable (data + power, not just power)
-4. Try different USB port
-5. Install CH340/CP2102 drivers if needed
+**Solutions:**
+1. Ensure clear line of sight
+2. Keep back of sensor >1cm from metal surfaces
+3. Note: 5-7m range is typical for indoor environments
 
-### Issue: Sensor always shows "NO" for presence
+## Optional Hardware Modifications
 
-**Cause**: Sensor may need configuration or environment factors
+The RCWL-0516 has solder pads on the back for modifications:
 
-**Solutions**:
-1. Verify sensor is started (self-test passed)
-2. Move within sensor range (1.2m - 8m)
-3. Ensure clear line of sight to sensor
-4. Wait 5-10 seconds after boot for sensor to stabilize
-5. Check sensor is in presence detection mode (printed at boot)
+| Pad | Modification | Effect |
+|-----|--------------|--------|
+| C-TM | Add capacitor | Extends trigger time (0.2µF=50s, 1µF=250s) |
+| R-GN | Add resistor | Reduces range (1MΩ=5m, 270kΩ=1.5m) |
+| R-CDS | Add LDR | Disables sensor in bright conditions |
 
-### Issue: Self-test shows "Config FAIL" or sensor in bad state
+## Technical Details
 
-**Symptoms**:
-- White LED doesn't light up (normally indicates presence)
-- Green LED blinks with I2C commands but sensor doesn't work
-- Configuration values read back as 0 or unexpected values
-- Sensor worked before but stopped after changing settings
+### Polling Rate
+- Sensor is read at 10Hz (every 100ms)
+- This provides responsive detection while avoiding excessive CPU usage
 
-**Cause**: Sensor flash memory may have invalid configuration
+### Motion State Machine
+- **MOTION_DETECTED**: Sensor output went HIGH
+- **MOTION_ACTIVE**: Sustained motion (keeps retriggering)
+- **MOTION_STOPPED**: No motion for 5 seconds (configurable via MOTION_TIMEOUT)
 
-**Solution**: Run the **sensor recovery tool** to factory reset:
-
-```bash
-arduino-cli compile --fqbn esp32:esp32:esp32 ../sensor_recovery && \
-arduino-cli upload --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 ../sensor_recovery && \
-arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200
-```
-
-The recovery tool sends `eRecoverSen` (0xAA) which performs a factory data reset. After recovery:
-1. Power cycle the sensor (unplug VCC, wait 5 seconds, reconnect)
-2. Run Stage 1 sketch again
-3. Verify all self-tests pass
-
-See `TROUBLESHOOTING.md` in the project root for detailed recovery instructions.
+### Memory Usage
+- Program storage: ~200KB (15% of flash)
+- Global variables: ~20KB (6% of RAM)
+- Free heap: ~305KB (well above 100KB minimum)
 
 ## Next Steps
 
 Once Stage 1 is working correctly:
 
 1. Verify all acceptance criteria are met
-2. Test sensor detection by moving in front of sensor
-3. Confirm serial commands work (especially 't' and 'i')
-4. Take note of free heap and I2C error count
-5. Proceed to Stage 2: WiFi and Web Interface
+2. Test motion detection from various angles and distances
+3. Confirm serial commands work
+4. Proceed to Stage 2: WiFi and Web Interface
 
-## Technical Details
+## References
 
-### Memory Usage
-- Program storage: 316,471 bytes (24% of 1.3MB)
-- Global variables: 22,224 bytes (6% of 327KB)
-- Free heap: ~305KB (well above 100KB minimum)
-
-### Sensor Configuration
-- I2C Address: 0x2A
-- I2C Clock: 100kHz
-- Mode: Presence Detection (eExitMode)
-- Poll Rate: 1Hz (1000ms interval)
-
-### Timing Parameters
-- Sensor poll interval: 1000ms (1Hz)
-- Heap monitor interval: 10000ms (10 seconds)
-- Heap minimum threshold: 100KB
+- [Random Nerd Tutorials: ESP32 RCWL-0516](https://randomnerdtutorials.com/esp32-rcwl-0516-arduino/)
+- [Instructables: All About RCWL-0516](https://www.instructables.com/All-About-RCWL-0516-Microwave-Radar-Motion-Sensor/)
+- [GitHub: RCWL-0516 Technical Info](https://github.com/jdesbonnet/RCWL-0516)

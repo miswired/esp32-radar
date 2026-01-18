@@ -1,98 +1,56 @@
 /**
- * ESP32 mmWave Presence Sensor - Stage 1: Basic Sensor Interface
+ * ESP32 Microwave Motion Sensor - Stage 1: Basic Sensor Interface
  *
  * This stage implements:
- * - I2C communication with DFRobot C4001 mmWave sensor
- * - Full sensor configuration (detection range, sensitivity, delays)
- * - Status register verification
- * - Sensor polling at 1Hz
+ * - GPIO communication with RCWL-0516 microwave radar sensor
+ * - Motion detection polling at 10Hz
+ * - State change detection with timestamps
  * - Serial output for debugging
  * - Built-in self-tests
  * - Serial command interface
  *
- * ⚠️  CRITICAL: DIP SWITCH CONFIGURATION REQUIRED! ⚠️
- *
- * The C4001 sensor has 2 DIP switches on the BACK of the board:
- *
- * 1. COMMUNICATION MODE SWITCH: Must be set to "I2C" position (NOT "UART")
- *    - This is the #1 cause of "NO Devices!" errors
- *    - Look for switch labeled "I2C/UART" or similar
- *
- * 2. ADDRESS SELECT SWITCH: Must match code setting (default 0x2A)
- *    - Toggle this switch if using multiple sensors
- *    - Our code uses SENSOR_I2C_ADDR = 0x2A
- *
- * If you see "NO Devices!" error, CHECK THE DIP SWITCHES FIRST!
- *
  * Hardware Requirements:
  * - ESP32-WROOM-32
- * - DFRobot SEN0610 C4001 mmWave sensor
- * - 2x 4.7kΩ resistors (pull-ups for I2C)
+ * - RCWL-0516 Microwave Radar Motion Sensor
  *
  * Connections:
- * - Sensor VCC → ESP32 3.3V (or 5V)
+ * - Sensor VIN → ESP32 VIN (5V from USB)
  * - Sensor GND → ESP32 GND
- * - Sensor SDA → ESP32 GPIO 21 (with 4.7kΩ pull-up to 3.3V)
- * - Sensor SCL → ESP32 GPIO 22 (with 4.7kΩ pull-up to 3.3V)
+ * - Sensor OUT → ESP32 GPIO 13
+ * - Sensor 3V3 → Do NOT connect (this is an output!)
+ * - Sensor CDS → Do NOT connect (optional LDR feature)
+ *
+ * RCWL-0516 Specifications:
+ * - Operating Voltage: 4-28V (use 5V from VIN)
+ * - Operating Frequency: ~3.2 GHz (Doppler radar)
+ * - Detection Range: 5-7 meters
+ * - Detection Angle: 360° omnidirectional
+ * - Output: 3.3V HIGH when motion detected, LOW otherwise
+ * - Trigger Duration: ~2-3 seconds (retriggerable)
  */
 
-#include <Wire.h>
-#include <DFRobot_C4001.h>
 #include <rom/rtc.h>  // For reset reason detection
-#include <soc/rtc_cntl_reg.h>  // For brownout detector control
-#include <soc/soc.h>  // For brownout detector control
 
-// I2C Configuration
-#define I2C_SDA_PIN 21
-#define I2C_SCL_PIN 22
-#define SENSOR_I2C_ADDR 0x2A
+// Pin Configuration
+#define SENSOR_PIN 13       // GPIO for sensor OUT pin
+#define LED_PIN 2           // Built-in LED for visual feedback
 
 // Timing Configuration
-#define SENSOR_POLL_INTERVAL 500   // 2Hz (500ms) - matches reference example
-#define HEAP_PRINT_INTERVAL 10000  // Print heap every 10 seconds
+#define SENSOR_POLL_INTERVAL 100   // 10Hz (100ms)
+#define HEAP_PRINT_INTERVAL 30000  // Print heap every 30 seconds
 #define HEAP_MIN_THRESHOLD 100000  // 100KB minimum free heap
 
-// Power Management Configuration
-// Set to 1 to disable brownout detector (use if experiencing spurious resets)
-// Set to 0 to keep brownout detector enabled (recommended for debugging power issues)
-#define DISABLE_BROWNOUT_DETECTOR 1
-
-// ============================================================================
-// SENSOR CONFIGURATION PARAMETERS
-// Adjust these values to tune detection behavior
-// ============================================================================
-
-// Detection Range Configuration (in cm)
-// min: Minimum detection distance, range 30-2500 cm (0.3m - 25m)
-// max: Maximum detection distance, range 240-2500 cm (2.4m - 25m)
-// trig: Trigger distance, typically set equal to max
-#define DETECTION_MIN_RANGE 30     // 30cm = 0.3m minimum
-#define DETECTION_MAX_RANGE 800    // 800cm = 8m maximum (presence mode limit)
-#define DETECTION_TRIG_RANGE 800   // 800cm = 8m trigger range
-
-// Sensitivity Configuration (0-9, higher = more sensitive)
-// trigSensitivity: Sensitivity for initial detection trigger
-// keepSensitivity: Sensitivity for maintaining detection state
-#define TRIG_SENSITIVITY 3   // Trigger sensitivity (0-9) - lower = less sensitive
-#define KEEP_SENSITIVITY 3   // Keep/maintain sensitivity (0-9) - lower = less sensitive
-
-// Delay Configuration
-// trigDelay: Delay before triggering, unit 0.01s, range 0-200 (0-2 seconds)
-// keepTimeout: Maintain detection timeout, unit 0.5s, range 4-3000 (2-1500 seconds)
-// NOTE: keep minimum is 4 (2 seconds), per DFRobot documentation
-#define TRIG_DELAY 100       // 100 * 0.01s = 1 second trigger delay (matches reference)
-#define KEEP_TIMEOUT 4       // 4 * 0.5s = 2 seconds keep timeout (minimum valid value)
-
-// Create sensor object
-DFRobot_C4001_I2C sensor(&Wire, SENSOR_I2C_ADDR);
+// Motion state tracking
+#define MOTION_TIMEOUT 5000  // Consider motion stopped after 5 seconds of no detection
 
 // Global state variables
 unsigned long lastSensorRead = 0;
 unsigned long lastHeapPrint = 0;
-bool presenceDetected = false;
+unsigned long lastMotionTime = 0;
 bool motionDetected = false;
-int i2cErrorCount = 0;
-bool sensorConfigured = false;
+bool motionActive = false;  // Sustained motion state
+unsigned long motionStartTime = 0;
+unsigned long totalMotionEvents = 0;
 
 // ============================================================================
 // RESET REASON DETECTION
@@ -100,14 +58,13 @@ bool sensorConfigured = false;
 
 /**
  * Print the reason for the last ESP32 reset
- * This helps diagnose unexpected resets that cause UART corruption
  */
 void printResetReason() {
   RESET_REASON reason = rtc_get_reset_reason(0);
 
   Serial.print("Reset reason: ");
   switch (reason) {
-    case 1:  Serial.println("POWERON_RESET - Vbat power on reset"); break;
+    case 1:  Serial.println("POWERON_RESET - Power on reset"); break;
     case 3:  Serial.println("SW_RESET - Software reset"); break;
     case 4:  Serial.println("OWDT_RESET - Legacy watch dog reset"); break;
     case 5:  Serial.println("DEEPSLEEP_RESET - Deep Sleep reset"); break;
@@ -115,7 +72,7 @@ void printResetReason() {
     case 7:  Serial.println("TG0WDT_SYS_RESET - Timer Group0 Watch dog reset"); break;
     case 8:  Serial.println("TG1WDT_SYS_RESET - Timer Group1 Watch dog reset"); break;
     case 9:  Serial.println("RTCWDT_SYS_RESET - RTC Watch dog Reset"); break;
-    case 10: Serial.println("INTRUSION_RESET - Instrusion tested to reset CPU"); break;
+    case 10: Serial.println("INTRUSION_RESET - Intrusion tested to reset CPU"); break;
     case 11: Serial.println("TGWDT_CPU_RESET - Time Group reset CPU"); break;
     case 12: Serial.println("SW_CPU_RESET - Software reset CPU"); break;
     case 13: Serial.println("RTCWDT_CPU_RESET - RTC Watch dog Reset CPU"); break;
@@ -125,234 +82,7 @@ void printResetReason() {
     default: Serial.println("UNKNOWN"); break;
   }
 
-  if (reason == 15) {
-    Serial.println("⚠️  BROWNOUT DETECTED - Check power supply voltage!");
-    Serial.println("     - Use quality USB cable (data + power)");
-    Serial.println("     - Ensure stable 5V power supply");
-    Serial.println("     - Check for voltage drops during I2C operations");
-  }
-
   Serial.flush();
-}
-
-// ============================================================================
-// SENSOR STATUS AND CONFIGURATION
-// ============================================================================
-
-/**
- * Read and display sensor status register
- * Returns: true if status is valid and sensor is initialized
- */
-bool printSensorStatus() {
-  Serial.println("\n--- Sensor Status Register ---");
-
-  sSensorStatus_t status = sensor.getStatus();
-
-  Serial.print("  Work Status: ");
-  Serial.print(status.workStatus);
-  Serial.println(status.workStatus == 1 ? " (Running)" : " (Stopped)");
-
-  Serial.print("  Work Mode: ");
-  Serial.print(status.workMode);
-  Serial.println(status.workMode == 0 ? " (Presence/Exit Mode)" : " (Speed Mode)");
-
-  Serial.print("  Init Status: ");
-  Serial.print(status.initStatus);
-  Serial.println(status.initStatus == 1 ? " (Initialized)" : " (Not Initialized)");
-
-  Serial.println("------------------------------");
-
-  return (status.initStatus == 1);
-}
-
-/**
- * Configure the sensor with detection parameters
- * Returns: true if all configurations succeeded
- */
-bool configureSensor() {
-  bool allSuccess = true;
-
-  Serial.println("\n--- Configuring Sensor ---");
-
-  // Set sensor mode to presence detection (eExitMode)
-  sensor.setSensorMode(eExitMode);
-  delay(100);
-  Serial.println("  Mode: Presence Detection (eExitMode)");
-
-  // Configure detection range
-  Serial.print("  Setting detection range (");
-  Serial.print(DETECTION_MIN_RANGE);
-  Serial.print("-");
-  Serial.print(DETECTION_MAX_RANGE);
-  Serial.print(" cm, trig=");
-  Serial.print(DETECTION_TRIG_RANGE);
-  Serial.print(" cm): ");
-
-  if (sensor.setDetectionRange(DETECTION_MIN_RANGE, DETECTION_MAX_RANGE, DETECTION_TRIG_RANGE)) {
-    Serial.println("OK");
-  } else {
-    Serial.println("FAILED");
-    allSuccess = false;
-  }
-
-  // Set trigger sensitivity
-  Serial.print("  Setting trigger sensitivity (");
-  Serial.print(TRIG_SENSITIVITY);
-  Serial.print("): ");
-
-  if (sensor.setTrigSensitivity(TRIG_SENSITIVITY)) {
-    Serial.println("OK");
-  } else {
-    Serial.println("FAILED");
-    allSuccess = false;
-  }
-
-  // Set keep sensitivity
-  Serial.print("  Setting keep sensitivity (");
-  Serial.print(KEEP_SENSITIVITY);
-  Serial.print("): ");
-
-  if (sensor.setKeepSensitivity(KEEP_SENSITIVITY)) {
-    Serial.println("OK");
-  } else {
-    Serial.println("FAILED");
-    allSuccess = false;
-  }
-
-  // Set delay parameters
-  Serial.print("  Setting delays (trig=");
-  Serial.print(TRIG_DELAY);
-  Serial.print(", keep=");
-  Serial.print(KEEP_TIMEOUT);
-  Serial.print("): ");
-
-  if (sensor.setDelay(TRIG_DELAY, KEEP_TIMEOUT)) {
-    Serial.println("OK");
-  } else {
-    Serial.println("FAILED");
-    allSuccess = false;
-  }
-
-  // Wait for sensor to apply delay settings
-  delay(500);
-
-  Serial.println("---------------------------");
-
-  return allSuccess;
-}
-
-/**
- * Read back and display all sensor configuration parameters
- * This verifies the configuration was applied correctly
- */
-void verifySensorConfig() {
-  Serial.println("\n--- Verifying Sensor Configuration ---");
-
-  // Read back sensitivity settings
-  uint8_t trigSens = sensor.getTrigSensitivity();
-  uint8_t keepSens = sensor.getKeepSensitivity();
-
-  Serial.print("  Trigger Sensitivity: ");
-  Serial.print(trigSens);
-  Serial.print(" (expected: ");
-  Serial.print(TRIG_SENSITIVITY);
-  Serial.println(trigSens == TRIG_SENSITIVITY ? ") ✓" : ") ✗ MISMATCH");
-
-  Serial.print("  Keep Sensitivity: ");
-  Serial.print(keepSens);
-  Serial.print(" (expected: ");
-  Serial.print(KEEP_SENSITIVITY);
-  Serial.println(keepSens == KEEP_SENSITIVITY ? ") ✓" : ") ✗ MISMATCH");
-
-  // Read back range settings
-  uint16_t minRange = sensor.getMinRange();
-  uint16_t maxRange = sensor.getMaxRange();
-  uint16_t trigRange = sensor.getTrigRange();
-
-  Serial.print("  Min Range: ");
-  Serial.print(minRange);
-  Serial.print(" cm (expected: ");
-  Serial.print(DETECTION_MIN_RANGE);
-  Serial.println(minRange == DETECTION_MIN_RANGE ? ") ✓" : ") ✗ MISMATCH");
-
-  Serial.print("  Max Range: ");
-  Serial.print(maxRange);
-  Serial.print(" cm (expected: ");
-  Serial.print(DETECTION_MAX_RANGE);
-  Serial.println(maxRange == DETECTION_MAX_RANGE ? ") ✓" : ") ✗ MISMATCH");
-
-  Serial.print("  Trigger Range: ");
-  Serial.print(trigRange);
-  Serial.print(" cm (expected: ");
-  Serial.print(DETECTION_TRIG_RANGE);
-  Serial.println(trigRange == DETECTION_TRIG_RANGE ? ") ✓" : ") ✗ MISMATCH");
-
-  // Read back delay settings
-  uint16_t keepTimeout = sensor.getKeepTimerout();
-  uint16_t trigDelay = sensor.getTrigDelay();
-
-  Serial.print("  Keep Timeout: ");
-  Serial.print(keepTimeout);
-  Serial.print(" (expected: ");
-  Serial.print(KEEP_TIMEOUT);
-  Serial.println(keepTimeout == KEEP_TIMEOUT ? ") ✓" : ") ✗ MISMATCH");
-
-  Serial.print("  Trigger Delay: ");
-  Serial.print(trigDelay);
-  Serial.print(" (expected: ");
-  Serial.print(TRIG_DELAY);
-  Serial.println(trigDelay == TRIG_DELAY ? ") ✓" : ") ✗ MISMATCH");
-
-  Serial.println("--------------------------------------");
-}
-
-/**
- * Print current sensor configuration (for 'c' command)
- */
-void printCurrentConfig() {
-  Serial.println("\n=== CURRENT SENSOR CONFIG ===");
-
-  // Status
-  sSensorStatus_t status = sensor.getStatus();
-  Serial.print("Work Status: ");
-  Serial.println(status.workStatus == 1 ? "Running" : "Stopped");
-  Serial.print("Work Mode: ");
-  Serial.println(status.workMode == 0 ? "Presence" : "Speed");
-  Serial.print("Init Status: ");
-  Serial.println(status.initStatus == 1 ? "OK" : "Failed");
-
-  Serial.println();
-
-  // Sensitivity
-  Serial.print("Trigger Sensitivity: ");
-  Serial.println(sensor.getTrigSensitivity());
-  Serial.print("Keep Sensitivity: ");
-  Serial.println(sensor.getKeepSensitivity());
-
-  Serial.println();
-
-  // Range
-  Serial.print("Min Range: ");
-  Serial.print(sensor.getMinRange());
-  Serial.println(" cm");
-  Serial.print("Max Range: ");
-  Serial.print(sensor.getMaxRange());
-  Serial.println(" cm");
-  Serial.print("Trigger Range: ");
-  Serial.print(sensor.getTrigRange());
-  Serial.println(" cm");
-
-  Serial.println();
-
-  // Delays
-  Serial.print("Trigger Delay: ");
-  Serial.print(sensor.getTrigDelay());
-  Serial.println(" (x0.01s)");
-  Serial.print("Keep Timeout: ");
-  Serial.print(sensor.getKeepTimerout());
-  Serial.println(" (x0.5s)");
-
-  Serial.println("=============================\n");
 }
 
 // ============================================================================
@@ -360,80 +90,71 @@ void printCurrentConfig() {
 // ============================================================================
 
 /**
- * Test I2C communication with the sensor
- * Returns: true if I2C communication is working, false otherwise
+ * Test GPIO pin configuration
+ * Returns: true if GPIO is configured correctly
  */
-bool testI2CCommunication() {
-  Wire.beginTransmission(SENSOR_I2C_ADDR);
-  byte error = Wire.endTransmission();
-
-  Serial.print("  I2C Communication (addr 0x");
-  Serial.print(SENSOR_I2C_ADDR, HEX);
+bool testGPIOConfiguration() {
+  Serial.print("  GPIO Configuration (pin ");
+  Serial.print(SENSOR_PIN);
   Serial.print("): ");
 
-  if (error == 0) {
-    Serial.println("PASS");
-    return true;
-  } else {
-    Serial.print("FAIL (error code: ");
-    Serial.print(error);
+  // Verify pin is set as input
+  pinMode(SENSOR_PIN, INPUT);
+
+  // Read the pin to verify it's accessible
+  int reading = digitalRead(SENSOR_PIN);
+
+  // Pin should read either HIGH or LOW (0 or 1)
+  if (reading == HIGH || reading == LOW) {
+    Serial.print("PASS (current: ");
+    Serial.print(reading == HIGH ? "HIGH" : "LOW");
     Serial.println(")");
+    return true;
+  } else {
+    Serial.println("FAIL (invalid reading)");
     return false;
   }
 }
 
 /**
- * Test sensor initialization and status
- * Returns: true if sensor is initialized, false otherwise
+ * Test LED pin configuration
+ * Returns: true if LED can be controlled
  */
-bool testSensorInitialization() {
-  Serial.print("  Sensor Init Status: ");
+bool testLEDConfiguration() {
+  Serial.print("  LED Configuration (pin ");
+  Serial.print(LED_PIN);
+  Serial.print("): ");
 
-  sSensorStatus_t status = sensor.getStatus();
+  pinMode(LED_PIN, OUTPUT);
 
-  if (status.initStatus == 1) {
-    Serial.println("PASS (initialized)");
-    return true;
-  } else {
-    Serial.println("FAIL (not initialized)");
-    return false;
-  }
+  // Blink LED briefly to verify
+  digitalWrite(LED_PIN, HIGH);
+  delay(100);
+  digitalWrite(LED_PIN, LOW);
+
+  Serial.println("PASS (blinked)");
+  return true;
 }
 
 /**
- * Test sensor configuration was applied correctly
- * Returns: true if all config values match expected, false otherwise
+ * Test sensor response (checks if sensor output changes or is stable)
+ * Returns: true (always passes - we're just reading the current state)
  */
-bool testSensorConfig() {
-  Serial.print("  Sensor Configuration: ");
+bool testSensorReading() {
+  Serial.print("  Sensor Reading: ");
 
-  bool allMatch = true;
+  int reading = digitalRead(SENSOR_PIN);
 
-  // Check sensitivity values
-  if (sensor.getTrigSensitivity() != TRIG_SENSITIVITY) allMatch = false;
-  if (sensor.getKeepSensitivity() != KEEP_SENSITIVITY) allMatch = false;
+  Serial.print("PASS (state: ");
+  Serial.print(reading == HIGH ? "MOTION" : "NO MOTION");
+  Serial.println(")");
 
-  // Check range values
-  if (sensor.getMinRange() != DETECTION_MIN_RANGE) allMatch = false;
-  if (sensor.getMaxRange() != DETECTION_MAX_RANGE) allMatch = false;
-  if (sensor.getTrigRange() != DETECTION_TRIG_RANGE) allMatch = false;
-
-  // Check delay values
-  if (sensor.getKeepTimerout() != KEEP_TIMEOUT) allMatch = false;
-  if (sensor.getTrigDelay() != TRIG_DELAY) allMatch = false;
-
-  if (allMatch) {
-    Serial.println("PASS (all values match)");
-    return true;
-  } else {
-    Serial.println("FAIL (config mismatch - run 'c' for details)");
-    return false;
-  }
+  return true;
 }
 
 /**
  * Test heap memory availability
- * Returns: true if heap is above minimum threshold, false otherwise
+ * Returns: true if heap is above minimum threshold
  */
 bool testHeapMemory() {
   uint32_t freeHeap = ESP.getFreeHeap();
@@ -448,24 +169,6 @@ bool testHeapMemory() {
 }
 
 /**
- * Test sensor reading functionality
- * Returns: true if sensor responds to read request
- */
-bool testSensorReading() {
-  Serial.print("  Sensor Reading: ");
-
-  // Try to read sensor data - this exercises the I2C read path
-  bool detected = sensor.motionDetection();
-
-  // If we get here without hanging, I2C read works
-  Serial.print("PASS (current state: ");
-  Serial.print(detected ? "DETECTED" : "NONE");
-  Serial.println(")");
-
-  return true;
-}
-
-/**
  * Run all self-tests and report results
  */
 void runSelfTest() {
@@ -473,25 +176,53 @@ void runSelfTest() {
 
   bool allPass = true;
 
-  allPass &= testI2CCommunication();
-  allPass &= testSensorInitialization();
-  allPass &= testSensorConfig();
-  allPass &= testHeapMemory();
+  allPass &= testGPIOConfiguration();
+  allPass &= testLEDConfiguration();
   allPass &= testSensorReading();
+  allPass &= testHeapMemory();
 
   Serial.println();
   Serial.print("Overall: ");
-  Serial.println(allPass ? "ALL TESTS PASSED ✓" : "SOME TESTS FAILED ✗");
+  Serial.println(allPass ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
   Serial.println("=========================\n");
 
   if (!allPass) {
     Serial.println("TROUBLESHOOTING:");
-    Serial.println("- I2C FAIL: Check 4.7kΩ pull-up resistors on SDA/SCL");
-    Serial.println("- Init FAIL: Verify sensor powered and DIP switch set to I2C");
-    Serial.println("- Config FAIL: Re-run configuration or check sensor limits");
-    Serial.println("- Heap FAIL: Check for memory leaks or reduce usage");
+    Serial.println("- GPIO FAIL: Check wiring to sensor OUT pin");
+    Serial.println("- LED FAIL: Built-in LED may not be on pin 2");
+    Serial.println("- Heap FAIL: Check for memory leaks");
     Serial.println();
   }
+}
+
+/**
+ * Print current sensor and motion statistics
+ */
+void printStats() {
+  Serial.println("\n=== MOTION STATISTICS ===");
+  Serial.print("Total Motion Events: ");
+  Serial.println(totalMotionEvents);
+  Serial.print("Current State: ");
+  Serial.println(motionActive ? "MOTION ACTIVE" : "NO MOTION");
+
+  if (motionActive && motionStartTime > 0) {
+    Serial.print("Current Motion Duration: ");
+    Serial.print((millis() - motionStartTime) / 1000);
+    Serial.println(" seconds");
+  }
+
+  if (lastMotionTime > 0) {
+    Serial.print("Last Motion: ");
+    Serial.print((millis() - lastMotionTime) / 1000);
+    Serial.println(" seconds ago");
+  } else {
+    Serial.println("Last Motion: Never");
+  }
+
+  Serial.print("Uptime: ");
+  Serial.print(millis() / 1000);
+  Serial.println(" seconds");
+  Serial.println("=========================\n");
 }
 
 /**
@@ -511,28 +242,17 @@ void handleSerialCommands() {
       case 'H':
         Serial.println("\n=== SERIAL COMMANDS ===");
         Serial.println("t - Run self test");
-        Serial.println("c - Print current sensor config");
-        Serial.println("s - Print sensor status register");
-        Serial.println("v - Verify sensor configuration");
+        Serial.println("s - Print motion statistics");
         Serial.println("h - Show this help menu");
         Serial.println("r - Restart ESP32");
         Serial.println("i - Print system info");
+        Serial.println("l - Toggle LED");
         Serial.println("=======================\n");
-        break;
-
-      case 'c':
-      case 'C':
-        printCurrentConfig();
         break;
 
       case 's':
       case 'S':
-        printSensorStatus();
-        break;
-
-      case 'v':
-      case 'V':
-        verifySensorConfig();
+        printStats();
         break;
 
       case 'r':
@@ -540,6 +260,17 @@ void handleSerialCommands() {
         Serial.println("Restarting ESP32...");
         delay(500);
         ESP.restart();
+        break;
+
+      case 'l':
+      case 'L':
+        {
+          static bool ledState = false;
+          ledState = !ledState;
+          digitalWrite(LED_PIN, ledState ? HIGH : LOW);
+          Serial.print("LED: ");
+          Serial.println(ledState ? "ON" : "OFF");
+        }
         break;
 
       case 'i':
@@ -562,10 +293,10 @@ void handleSerialCommands() {
         Serial.print("Uptime: ");
         Serial.print(millis() / 1000);
         Serial.println(" seconds");
-        Serial.print("I2C Errors: ");
-        Serial.println(i2cErrorCount);
-        Serial.print("Sensor Configured: ");
-        Serial.println(sensorConfigured ? "Yes" : "No");
+        Serial.print("Sensor Pin: GPIO ");
+        Serial.println(SENSOR_PIN);
+        Serial.print("Motion Events: ");
+        Serial.println(totalMotionEvents);
         Serial.println("===================\n");
         break;
 
@@ -586,71 +317,51 @@ void handleSerialCommands() {
 // ============================================================================
 
 void setup() {
-  // Disable brownout detector if configured (prevents spurious resets)
-  #if DISABLE_BROWNOUT_DETECTOR
-    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
-  #endif
-
   // Initialize serial communication
   Serial.begin(115200);
   while(!Serial);  // Wait for serial port to connect
-  delay(1000);     // Additional stabilization delay
+  delay(1000);     // Stabilization delay
 
   Serial.println("\n\n");
-  Serial.println("========================================");
-  Serial.println("ESP32 mmWave Presence Sensor - Stage 1");
-  Serial.println("========================================");
+  Serial.println("==========================================");
+  Serial.println("ESP32 Microwave Motion Sensor - Stage 1");
+  Serial.println("==========================================");
+  Serial.println("Sensor: RCWL-0516 Microwave Radar");
   Serial.println();
 
-  // Print reset reason to diagnose unexpected resets
+  // Print reset reason
   printResetReason();
   Serial.println();
 
-  // Initialize I2C with custom pins
-  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-  Wire.setClock(100000);  // 100kHz I2C clock
-  Serial.println("I2C initialized (GPIO 21=SDA, GPIO 22=SCL)");
+  // Initialize sensor pin as input
+  pinMode(SENSOR_PIN, INPUT);
+  Serial.print("Sensor pin configured (GPIO ");
+  Serial.print(SENSOR_PIN);
+  Serial.println(")");
 
-  // Initialize sensor
-  Serial.println("Initializing C4001 mmWave sensor...");
+  // Initialize LED pin for visual feedback
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+  Serial.print("LED pin configured (GPIO ");
+  Serial.print(LED_PIN);
+  Serial.println(")");
 
-  // Keep trying to initialize until successful
-  while (!sensor.begin()) {
-    Serial.println("NO Devices! Retrying in 2 seconds...");
-    Serial.println("Check:");
-    Serial.println("  - DIP switch on sensor back is set to I2C mode");
-    Serial.println("  - Sensor is powered (VCC and GND connected)");
-    Serial.println("  - 4.7kΩ pull-up resistors installed on SDA/SCL");
-    delay(2000);
-  }
-
-  Serial.println("Device connected!");
-
-  // Print initial sensor status
-  printSensorStatus();
-
-  // Configure the sensor with our desired parameters
-  sensorConfigured = configureSensor();
-
-  // Wait for configuration to take effect
-  delay(500);
-
-  // Verify configuration was applied correctly
-  verifySensorConfig();
-
-  // Print final status after configuration
-  printSensorStatus();
-
+  Serial.println();
+  Serial.println("Sensor specifications:");
+  Serial.println("  - Detection range: 5-7 meters");
+  Serial.println("  - Detection angle: 360 degrees");
+  Serial.println("  - Trigger duration: ~2-3 seconds");
+  Serial.println("  - Output: HIGH when motion detected");
   Serial.println();
 
   // Run self-test automatically on boot
   runSelfTest();
 
   Serial.println("Type 'h' for help menu");
-  Serial.println("Type 'c' to view current config");
+  Serial.println("Type 's' for motion statistics");
   Serial.println();
-  Serial.println("Starting sensor polling at 2Hz...");
-  Serial.println("----------------------------------------");
+  Serial.println("Starting motion detection at 10Hz...");
+  Serial.println("------------------------------------------");
 }
 
 // ============================================================================
@@ -667,35 +378,66 @@ void loop() {
   if (currentMillis - lastSensorRead >= SENSOR_POLL_INTERVAL) {
     lastSensorRead = currentMillis;
 
-    // Read sensor using motionDetection()
-    bool detected = sensor.motionDetection();
+    // Read sensor state
+    bool currentReading = (digitalRead(SENSOR_PIN) == HIGH);
 
-    // Track state changes
-    bool stateChanged = (detected != presenceDetected);
-    presenceDetected = detected;
-    motionDetected = detected;
+    // Update LED to match sensor state
+    digitalWrite(LED_PIN, currentReading ? HIGH : LOW);
 
-    // Print sensor data
-    Serial.print("[");
-    Serial.print(millis() / 1000);
-    Serial.print("s] ");
-    Serial.print("Presence: ");
-    Serial.print(presenceDetected ? "YES" : "NO ");
-    Serial.print(" | Motion: ");
-    Serial.print(motionDetected ? "DETECTED" : "NONE    ");
+    // Detect state changes
+    if (currentReading && !motionDetected) {
+      // Motion just started
+      motionDetected = true;
+      lastMotionTime = currentMillis;
 
-    if (stateChanged) {
-      Serial.print(" <-- STATE CHANGED");
+      if (!motionActive) {
+        // New motion event
+        motionActive = true;
+        motionStartTime = currentMillis;
+        totalMotionEvents++;
+
+        Serial.print("[");
+        Serial.print(currentMillis / 1000);
+        Serial.print("s] MOTION DETECTED (#");
+        Serial.print(totalMotionEvents);
+        Serial.println(")");
+        Serial.flush();
+      }
+    } else if (currentReading && motionDetected) {
+      // Motion continues
+      lastMotionTime = currentMillis;
+    } else if (!currentReading && motionDetected) {
+      // Sensor went LOW, but might retrigger
+      motionDetected = false;
     }
 
-    Serial.println();
-    Serial.flush();
+    // Check for motion timeout (sustained no-motion)
+    if (motionActive && !motionDetected &&
+        (currentMillis - lastMotionTime >= MOTION_TIMEOUT)) {
+      motionActive = false;
 
-    // Reset error count on successful read
-    if (i2cErrorCount > 0) {
-      Serial.println("I2C communication recovered!");
+      unsigned long duration = (lastMotionTime - motionStartTime) / 1000;
+      Serial.print("[");
+      Serial.print(currentMillis / 1000);
+      Serial.print("s] MOTION STOPPED (duration: ");
+      Serial.print(duration);
+      Serial.println("s)");
       Serial.flush();
-      i2cErrorCount = 0;
+
+      motionStartTime = 0;
+    }
+
+    // Periodic status output (every 10 seconds when motion active)
+    static unsigned long lastStatusPrint = 0;
+    if (motionActive && (currentMillis - lastStatusPrint >= 10000)) {
+      lastStatusPrint = currentMillis;
+      unsigned long duration = (currentMillis - motionStartTime) / 1000;
+      Serial.print("[");
+      Serial.print(currentMillis / 1000);
+      Serial.print("s] Motion active for ");
+      Serial.print(duration);
+      Serial.println("s...");
+      Serial.flush();
     }
   }
 

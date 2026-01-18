@@ -1,376 +1,256 @@
-# I2C Communication Troubleshooting Guide for C4001 Sensor
+# Troubleshooting Guide for RCWL-0516 Sensor
 
-## CRITICAL: Check DIP Switches First!
+This guide covers common issues with the RCWL-0516 microwave radar motion sensor and ESP32.
 
-The **#1 cause of I2C failures** with the C4001 sensor is incorrect DIP switch configuration.
+## Quick Diagnostic
 
-### Location
-The sensor has **2 DIP switches on the back** of the board.
-
-### Switch Configuration
-
-1. **Communication Mode Switch (I2C/UART)**
-   - **MUST be set to I2C position**
-   - If in UART position, the sensor will NOT respond on I2C bus
-   - Look for a switch labeled "I2C/UART" or similar
-
-2. **Address Select Switch**
-   - Selects between address 0x2A or 0x2B
-   - Default is usually 0x2A
-   - Our code uses 0x2A by default (`SENSOR_I2C_ADDR 0x2A`)
-
-**ACTION**: Physically inspect the sensor and verify both switches are correctly set!
-
-## Step-by-Step Diagnostic Process
-
-### Step 1: Run I2C Scanner
-
-Before debugging the main code, verify the sensor appears on the I2C bus.
-
-```bash
-cd /home/miswired/Multiverse/esp32-radar/i2c_scanner
-arduino-cli upload --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 i2c_scanner.ino
-arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200
-```
-
-**Expected output if sensor is working**:
-```
-I2C device found at address 0x2A  <- DFRobot C4001 Sensor!
-Found 1 device(s)
-```
-
-**If no devices found**:
-- ❌ DIP switch is in UART mode (most common!)
-- ❌ Missing or incorrect pull-up resistors
-- ❌ Wiring error
-- ❌ Sensor not powered
-- ❌ Faulty sensor
-
-### Step 2: Verify Hardware Connections
-
-#### Power Connections
-```bash
-# Measure voltage at sensor VCC pin
-# Should read 3.3V or 5V (depending on your connection)
-```
-
-**Check**:
-- [ ] VCC connected to ESP32 3.3V (or 5V)
-- [ ] GND connected to ESP32 GND
-- [ ] LED on sensor lights up (if present)
-
-#### I2C Connections
-
-**Wiring**:
-```
-ESP32 GPIO 21 (SDA) → Sensor SDA
-ESP32 GPIO 22 (SCL) → Sensor SCL
-```
-
-**Measure voltage on I2C lines** (multimeter in DC voltage mode):
-```bash
-# With pull-up resistors installed:
-# SDA line should read: ~3.3V (idle state)
-# SCL line should read: ~3.3V (idle state)
-```
-
-If reading 0V on SDA/SCL:
-- Missing pull-up resistors
-- Short circuit to ground
-- Faulty wiring
-
-#### Pull-up Resistors
-
-**CRITICAL**: 4.7kΩ resistors required on BOTH lines!
+Run the self-test by typing `t` in the serial monitor:
 
 ```
-3.3V ─┬─── 4.7kΩ ───┬─── SDA (GPIO 21) ─── Sensor SDA
-      │             │
-      └─── 4.7kΩ ───┴─── SCL (GPIO 22) ─── Sensor SCL
+=== STAGE 1 SELF TEST ===
+  GPIO Configuration (pin 13): PASS (current: LOW)
+  LED Configuration (pin 2): PASS (blinked)
+  Sensor Reading: PASS (state: NO MOTION)
+  Free Heap (305456 bytes): PASS
+
+Overall: ALL TESTS PASSED
+=========================
 ```
 
-**Check**:
-- [ ] 4.7kΩ resistor from SDA to 3.3V
-- [ ] 4.7kΩ resistor from SCL to 3.3V
-- [ ] Resistors are actually 4.7kΩ (measure with multimeter if uncertain)
-- [ ] Resistors connected to 3.3V (not 5V, not floating)
-
-**Common mistakes**:
-- Using wrong resistor value (4.7kΩ required, not 1kΩ or 10kΩ)
-- Connecting pull-ups to wrong voltage rail
-- Forgetting one of the two resistors
-
-### Step 3: Check I2C Address
-
-If scanner finds a device but at wrong address:
-
-**Found at 0x2B instead of 0x2A**:
-- Toggle the address select DIP switch
-- OR change code to use `DEVICE_ADDR_1` (0x2B)
-
-**To use 0x2B address in code**:
-```cpp
-// Change this line in stage1_sensor_basic.ino:
-#define SENSOR_I2C_ADDR 0x2B  // Was 0x2A
-```
-
-### Step 4: Verify Code Configuration
-
-If I2C scanner shows device at 0x2A but main code fails:
-
-1. **Check I2C initialization**:
-   ```cpp
-   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);  // GPIO 21, 22
-   Wire.setClock(100000);  // 100kHz
-   ```
-
-2. **Verify sensor object creation**:
-   ```cpp
-   DFRobot_C4001_I2C sensor(&Wire, SENSOR_I2C_ADDR);
-   ```
-
-3. **Check begin() call pattern**:
-   ```cpp
-   while (!sensor.begin()) {
-     Serial.println("NO Devices!");
-     delay(2000);
-   }
-   ```
-
-## Sensor Recovery (Factory Reset)
-
-If your sensor gets into a bad state after configuration changes, you may need to run the **sensor recovery tool** to factory reset it.
-
-### Symptoms That Indicate Recovery Is Needed
-
-- **White LED doesn't light up** (normally indicates presence detection)
-- **Green LED blinks** with I2C commands but sensor doesn't respond correctly
-- **Configuration values read back as 0** or unexpected values
-- **Sensor worked before** but stopped after changing sensitivity or other settings
-- **Self-test shows "Config FAIL"** even though I2C communication passes
-- **Sensor detected on I2C bus** but `begin()` fails or returns wrong status
-
-### What Causes This
-
-The C4001 sensor stores configuration in internal flash memory. Certain invalid configurations (especially extreme sensitivity values or timing parameters) can put the sensor into an unresponsive state. This is a known issue discussed on the [DFRobot forums](https://www.dfrobot.com/forum/topic/335591).
-
-### Running the Recovery Tool
-
-```bash
-# Compile and upload the recovery tool
-arduino-cli compile --fqbn esp32:esp32:esp32 /home/miswired/Multiverse/esp32-radar/sensor_recovery && \
-arduino-cli upload --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 /home/miswired/Multiverse/esp32-radar/sensor_recovery && \
-arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200
-```
-
-### What the Recovery Tool Does
-
-1. Scans I2C bus to find the sensor
-2. Sends `eStopSen` (0x33) - stops sensor collection
-3. Sends `eRecoverSen` (0xAA) - **factory data reset**
-4. Sends `eResetSen` (0xCC) - system reset
-5. Reinitializes and verifies the sensor
-6. Reports status before and after recovery
-
-### Expected Recovery Output
-
-```
-==========================================
-  C4001 SENSOR RECOVERY TOOL
-==========================================
-
-=== I2C Bus Scan ===
-  Found device at 0x2A
-  Total devices: 1
-====================
-
---- Trying Primary Address (0x2A) ---
-
-Attempting recovery on address 0x2A
-  Device found, attempting begin()...
-  begin() succeeded
-
-  Reading status before recovery...
-    Work Status: 1
-    Work Mode: 0
-    Init Status: 1
-
-  Step 1: Stopping sensor...
-  Step 2: Sending factory reset (eRecoverSen)...
-  Step 3: Sending system reset (eResetSen)...
-  Step 4: Reinitializing sensor...
-  begin() succeeded after reset!
-
-  Reading configuration after recovery...
-    Trig Sensitivity: 3
-    Keep Sensitivity: 3
-    Min Range: 30
-    Max Range: 800
-
-  Step 5: Starting sensor...
-
-  Final status check...
-    Work Status: 1 (Running)
-    Init Status: 1 (OK)
-
-==========================================
-  RECOVERY COMPLETE
-==========================================
-
-Recovery appears successful!
-Please power cycle the sensor (unplug and replug)
-then try the Stage 1 sketch again.
-```
-
-### After Recovery
-
-1. **Power cycle the sensor** - unplug VCC, wait 5 seconds, reconnect
-2. **Run Stage 1 sketch** - verify all self-tests pass
-3. **Check configuration** - type 'c' to see current config values
-
-### Recovery Commands
-
-While the recovery tool is running:
-- **s** - Scan I2C bus again
-- **r** - Retry the recovery process
-- **p** - Show power cycle instructions
-
-### If Recovery Fails
-
-If the sensor still doesn't work after recovery:
-1. Try switching to **UART mode** (DIP switch) and use serial commands
-2. Power cycle multiple times between recovery attempts
-3. The sensor may be hardware damaged and need replacement
+If any test fails, see the relevant section below.
 
 ---
 
 ## Common Issues and Solutions
 
-### Issue: "NO Devices!" message repeating
+### Issue: Sensor Always Reads LOW (No Motion Detected)
 
-**Most likely cause**: DIP switch in UART mode
+**Symptoms:**
+- Self-test shows "state: NO MOTION" even when moving
+- LED never turns on
+- No "MOTION DETECTED" messages in serial output
 
-**Solutions** (in order of likelihood):
-1. ✅ **Check DIP switch** - set to I2C mode
-2. ✅ **Install pull-up resistors** - 4.7kΩ on SDA and SCL
-3. ✅ **Verify wiring** - GPIO 21→SDA, GPIO 22→SCL
-4. ✅ **Check power** - measure VCC at sensor (3.3V)
-5. ✅ **Run I2C scanner** - verify device appears at 0x2A
+**Most Likely Causes:**
 
-### Issue: I2C scanner finds device but sensor.begin() fails
+1. **Wiring Error** - Check connections:
+   ```
+   RCWL-0516    ESP32
+   ---------    -----
+   VIN      →   VIN (5V)  ← NOT 3.3V!
+   GND      →   GND
+   OUT      →   GPIO 13
+   ```
 
-**Possible causes**:
-- Wrong I2C address in code vs DIP switch setting
-- Sensor initialization timing issue
-- Library version incompatibility
+2. **Power Issue** - Sensor needs 4-28V:
+   - Must use ESP32 VIN pin (5V from USB)
+   - 3.3V is NOT enough to power the sensor
+   - Check USB cable is providing power (data+power cable, not charge-only)
 
-**Solutions**:
-1. Verify address matches: code=0x2A, DIP switch=0x2A position
-2. Add delay before begin(): `delay(500);` after `Wire.begin()`
-3. Check library version: `arduino-cli lib list | grep DFRobot`
-4. Power cycle the sensor
+3. **Wrong GPIO Pin** - Verify code matches wiring:
+   ```cpp
+   #define SENSOR_PIN 13  // Must match your wiring
+   ```
 
-### Issue: Intermittent I2C errors during operation
+**Verification Steps:**
+1. Use a multimeter to check 5V at sensor VIN pin
+2. Check continuity from sensor OUT to GPIO 13
+3. Try a different GPIO pin and update the code
 
-**Symptoms**: Tests pass initially, but "I2C error count" increases
+---
 
-**Solutions**:
-1. Shorten wire length (keep under 20cm if possible)
-2. Use higher quality jumper wires
-3. Verify pull-up resistor connections are solid
-4. Check for loose breadboard connections
-5. Add 100nF capacitor between VCC and GND at sensor
-6. Reduce I2C clock speed: `Wire.setClock(50000);` // 50kHz
+### Issue: Sensor Always Reads HIGH (Constant Motion)
 
-### Issue: Tests pass but no presence detection
+**Symptoms:**
+- Self-test shows "state: MOTION" even when still
+- LED always on
+- Constant "MOTION DETECTED" messages
 
-**This is different from I2C failure** - sensor communicates but doesn't detect:
+**Most Likely Causes:**
 
-**Solutions**:
-1. Wait 5-10 seconds after boot for sensor calibration
-2. Move within detection range (1.2m - 8m from sensor)
-3. Ensure clear line of sight (no obstacles)
-4. Check sensor mode is eExitMode (presence detection)
-5. Adjust sensitivity settings if needed
+1. **Metal Objects Too Close** - The sensor's back side is sensitive:
+   - Keep metal objects >1cm from back of sensor
+   - Metal PCB standoffs, enclosures, or surfaces can cause reflections
 
-## Code Updates Applied
+2. **Vibration** - The sensor is very sensitive:
+   - Mount rigidly to prevent vibration-induced triggers
+   - Fans, motors, or unstable surfaces can cause false triggers
 
-Based on official DFRobot examples, the following fixes were applied:
+3. **Electrical Noise** - Poor power quality:
+   - Add 100nF ceramic capacitor between VIN and GND at sensor
+   - Use shorter wires
+   - Use a quality USB power supply
 
-### Fix 1: Removed incorrect setSensor() call
-```cpp
-// BEFORE (incorrect):
-sensor.begin();
-sensor.setSensor(eStartSen);  // This method doesn't work as expected
+4. **Sensor Orientation** - Component side should face detection area:
+   - The side with ICs and components is the "front"
+   - The side with solder pads (C-TM, R-GN, R-CDS) is the "back"
 
-// AFTER (correct):
-sensor.begin();
-sensor.setSensorMode(eExitMode);  // Set presence detection mode
-```
+---
 
-### Fix 2: Added retry loop in setup()
-```cpp
-// Match official example pattern:
-while (!sensor.begin()) {
-  Serial.println("NO Devices! Retrying...");
-  delay(2000);
-}
-```
+### Issue: Erratic/Inconsistent Readings
 
-### Fix 3: Updated self-test to match official API
-```cpp
-bool testSensorInitialization() {
-  bool success = sensor.begin();
-  if (success) {
-    sensor.setSensorMode(eExitMode);  // Correct API call
-    return true;
-  }
-  return false;
-}
-```
+**Symptoms:**
+- Random motion detection events
+- Detection sometimes works, sometimes doesn't
+- Readings seem delayed or laggy
 
-## Hardware Checklist
+**Most Likely Causes:**
 
-Before proceeding, verify:
+1. **Long Wires** - Keep wires short:
+   - Use wires <20cm for reliable operation
+   - Long wires can act as antennas and pick up noise
 
-- [ ] Sensor has power (measure VCC = 3.3V or 5V)
-- [ ] GND connected
-- [ ] DIP switch #1 set to **I2C** (not UART)
-- [ ] DIP switch #2 matches code address (default 0x2A)
-- [ ] 4.7kΩ pull-up resistor on SDA line
-- [ ] 4.7kΩ pull-up resistor on SCL line
-- [ ] Pull-ups connected to 3.3V
-- [ ] SDA connected to GPIO 21
-- [ ] SCL connected to GPIO 22
-- [ ] I2C scanner detects device at 0x2A
+2. **Poor Connections** - Check all connections:
+   - Breadboard connections can be unreliable
+   - Solder connections for permanent installation
 
-## Next Steps
+3. **Insufficient Power** - ESP32 + sensor need adequate current:
+   - Use a good USB cable and power source
+   - Cheap USB cables may have high resistance
 
-1. **Run I2C scanner first** to confirm sensor is visible
-2. **Check DIP switches** if scanner finds no devices
-3. **Flash updated Stage 1 code** with corrected API calls
-4. **Monitor serial output** for specific error messages
-5. **Report findings** - which tests pass/fail for further diagnosis
+---
 
-## Reference Links
+### Issue: Detection Range Seems Short
 
-- [DFRobot C4001 Official Wiki](https://wiki.dfrobot.com/SKU_SEN0610_Gravity_C4001_mmWave_Presence_Sensor_12m_I2C_UART)
-- [ESP32 I2C Guide](https://www.espboards.dev/sensors/c4001/)
-- [DFRobot Forum - I2C Issues](https://www.dfrobot.com/forum/topic/399073)
-- [Official GitHub Examples](https://github.com/dfrobot/DFRobot_C4001)
-- [SmartHomeScene Tutorial](https://smarthomescene.com/diy/diy-presence-sensor-with-25m-detection-range-using-dfrobot-c4001-and-esp32/)
+**Expected Range:** 5-7 meters in typical indoor environment
 
-## Contact for Help
+**If Range is Shorter:**
+
+1. **Obstructions** - Check line of sight:
+   - Sensor detects through plastic, wood, drywall
+   - Metal blocks or significantly attenuates the signal
+   - Thick walls reduce range
+
+2. **Metal Behind Sensor** - Keep back clear:
+   - Metal mounting surfaces reduce performance
+   - Maintain >1cm gap from metal
+
+3. **Environmental Factors:**
+   - Large metal objects in room can create dead zones
+   - Water (pipes, aquariums) can attenuate signal
+
+**Range Reduction (Optional):**
+If you want to REDUCE range, add a resistor to R-GN pad:
+- 1MΩ = ~5m range
+- 270kΩ = ~1.5m range
+
+---
+
+### Issue: LED Not Working
+
+**Symptoms:**
+- Motion detected in serial output but LED doesn't light
+- Self-test shows LED "blinked" but you didn't see it
+
+**Solutions:**
+
+1. **Check LED Pin** - Different ESP32 boards use different pins:
+   ```cpp
+   #define LED_PIN 2  // Common for ESP32-WROOM-32
+   ```
+   Other boards may use different pins (e.g., 5, 22)
+
+2. **LED Polarity** - Some boards have inverted LED logic:
+   - Try swapping HIGH/LOW in the code
+
+3. **Damaged LED** - The built-in LED may be faulty:
+   - Connect an external LED with resistor to verify
+
+---
+
+### Issue: Heap Memory Warning
+
+**Symptoms:**
+- "WARNING: Low heap memory!" message
+- Free heap below 100KB
+
+**Solutions:**
+1. This shouldn't happen with Stage 1 alone
+2. If it occurs, restart ESP32 (type `r`)
+3. Check for memory leaks if using modified code
+
+---
+
+## Hardware Verification Checklist
+
+Before troubleshooting software, verify hardware:
+
+- [ ] ESP32 powers on (power LED lit)
+- [ ] USB cable is data+power (not charge-only)
+- [ ] VIN connected to ESP32 VIN (5V), not 3.3V
+- [ ] GND connected to ESP32 GND
+- [ ] OUT connected to GPIO 13
+- [ ] Sensor 3V3 pin is NOT connected
+- [ ] Sensor CDS pin is NOT connected
+- [ ] No metal within 1cm of sensor back
+- [ ] Sensor mounted rigidly (no vibration)
+- [ ] Component side facing detection area
+
+---
+
+## Understanding Sensor Behavior
+
+### Normal Operation
+
+The RCWL-0516 uses Doppler radar to detect motion:
+
+1. **Motion Start**: Output goes HIGH (3.3V)
+2. **Continued Motion**: Output stays HIGH (retriggerable)
+3. **Motion Stop**: Output stays HIGH for ~2-3 seconds
+4. **No Motion**: Output goes LOW (0V)
+
+### What It Detects
+
+- Any moving object (people, animals, fans, etc.)
+- Movement through non-metallic materials
+- Movement at speeds up to 2 m/s
+
+### What It Doesn't Detect
+
+- Stationary objects (even people sitting still)
+- Movement behind metal barriers
+- Very slow movement (<0.1 m/s)
+
+---
+
+## Serial Commands for Debugging
+
+| Command | Use For |
+|---------|---------|
+| `t` | Run self-test - checks GPIO, LED, sensor reading |
+| `s` | View motion statistics - event count, current state |
+| `i` | System info - heap, uptime, chip details |
+| `r` | Restart ESP32 - fresh start |
+| `l` | Toggle LED - verify LED works independently |
+
+---
+
+## Factory Reset Not Needed
+
+Unlike the C4001 sensor, the RCWL-0516 has no software configuration to corrupt. If you're having issues:
+
+1. Check wiring
+2. Check power
+3. Check for metal/vibration interference
+4. Replace sensor if damaged (~$1-2)
+
+There's no firmware to brick and no recovery tool needed!
+
+---
+
+## Getting Help
 
 If still having issues after following this guide:
 
-1. Run I2C scanner and capture output
-2. Take photo of DIP switch positions
-3. Capture serial monitor output from Stage 1
-4. Measure and report:
-   - Voltage at sensor VCC pin
-   - Voltage at SDA line
-   - Voltage at SCL line
-5. Report which step in this guide you're stuck at
+1. Run self-test (`t`) and note results
+2. Run system info (`i`) and note details
+3. Check wiring matches the diagram exactly
+4. Measure voltages with multimeter:
+   - VIN at sensor should be ~5V
+   - OUT at sensor should be 0V (no motion) or 3.3V (motion)
 
-This will help diagnose the specific issue!
+## References
+
+- [Random Nerd Tutorials: ESP32 RCWL-0516](https://randomnerdtutorials.com/esp32-rcwl-0516-arduino/)
+- [Instructables: All About RCWL-0516](https://www.instructables.com/All-About-RCWL-0516-Microwave-Radar-Motion-Sensor/)
+- [GitHub: RCWL-0516 Technical Info](https://github.com/jdesbonnet/RCWL-0516)
+- [Microcontrollers Lab: RCWL-0516 with ESP32](https://microcontrollerslab.com/rcwl-0516-microwave-radar-sensor-esp32/)

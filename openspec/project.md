@@ -1,25 +1,30 @@
 # Project Context
 
 ## Purpose
-ESP32-based human presence detection system using DFRobot SEN0610 C4001 24GHz mmWave FMCW radar sensor. The system provides:
-- Real-time human presence detection (up to 8m range)
-- Motion detection and ranging (up to 12m range)
+ESP32-based motion detection system using RCWL-0516 Microwave Radar sensor. The system provides:
+- Real-time motion detection (5-7m range)
+- Simple digital output (HIGH when motion detected)
 - WiFi-enabled web interface for status monitoring and configuration
 - Serial output for debugging and data logging
 
-Target use cases: smart home automation, occupancy detection, energy management
+Target use cases: smart home automation, occupancy detection, security, energy management
+
+## Sensor Change Notice
+
+**Previous Sensor:** DFRobot SEN0610 C4001 24GHz mmWave (archived due to reliability issues)
+**Current Sensor:** RCWL-0516 Microwave Radar Motion Sensor
+
+See `archive/c4001_sensor/ARCHIVE_README.md` for details on why the sensor was changed.
 
 ## Tech Stack
 - **Microcontroller**: ESP32-WROOM-32 (Dual-core Xtensa LX6, WiFi/BT)
-- **Sensor**: DFRobot SEN0610 C4001 mmWave Presence Sensor (24GHz FMCW)
-- **Communication**: I2C interface (GPIO 21=SDA, GPIO 22=SCL)
+- **Sensor**: RCWL-0516 Microwave Radar Motion Sensor (~3.2GHz Doppler radar)
+- **Communication**: Simple digital GPIO (no protocol required)
 - **Development**: Arduino IDE with ESP32 board support
 - **Programming Language**: C++ (Arduino framework)
 - **Web Interface**: ESP32 async web server (ESPAsyncWebServer library recommended)
 - **WiFi**: 2.4GHz 802.11 b/g/n
 - **Libraries**:
-  - DFRobot_C4001 (sensor interface)
-  - Wire.h (I2C communication)
   - WiFi.h (ESP32 WiFi)
   - ESPAsyncWebServer.h (async web server)
   - AsyncTCP.h (async networking)
@@ -28,92 +33,108 @@ Target use cases: smart home automation, occupancy detection, energy management
 
 ### Code Style
 - Follow Arduino coding style conventions
-- Use camelCase for variables and functions: `sensorData`, `readPresence()`
-- Use PascalCase for classes: `PresenceSensor`
-- Use UPPER_CASE for constants: `I2C_SDA_PIN`, `WIFI_TIMEOUT`
+- Use camelCase for variables and functions: `sensorData`, `readMotion()`
+- Use PascalCase for classes: `MotionSensor`
+- Use UPPER_CASE for constants: `SENSOR_PIN`, `WIFI_TIMEOUT`
 - Indentation: 2 spaces (Arduino IDE default)
 - Max line length: 100 characters
 - Always initialize variables at declaration
 - Use descriptive names for functions and variables
-- Add comments for complex logic and sensor-specific configurations
+- Add comments for complex logic
 
 ### Architecture Patterns
 - **Modular Design**: Separate concerns into logical modules
-  - Sensor reading module (I2C communication with C4001)
+  - Sensor reading module (GPIO digital read)
   - Web server module (HTTP endpoints, WebSocket for real-time updates)
   - WiFi management module (connection, reconnection handling)
-  - Data processing module (filtering, state management)
+  - Data processing module (debouncing, state management)
 - **Non-blocking Code**: Use async patterns to prevent blocking main loop
-- **State Machine**: Manage sensor states (idle, detecting, presence confirmed)
-- **Event-driven**: Trigger actions based on presence/motion events
-- **Configuration Management**: Store WiFi credentials and sensor settings in EEPROM/NVS
+- **State Machine**: Manage sensor states (idle, motion detected)
+- **Event-driven**: Trigger actions based on motion events
+- **Configuration Management**: Store WiFi credentials and settings in EEPROM/NVS
 
 ### Testing Strategy
 - **Serial Debugging**: Use Serial.print() extensively during development
 - **Unit Testing**: Test individual sensor reading functions
-- **Integration Testing**: Verify I2C communication, WiFi connectivity, web interface
+- **Integration Testing**: Verify GPIO reading, WiFi connectivity, web interface
 - **Field Testing**: Validate detection accuracy at various distances and angles
-- **Edge Cases**: Test sensor behavior with multiple people, static presence, no presence
+- **Edge Cases**: Test sensor behavior with multiple people, static presence, no motion
 
 ### Git Workflow
 - Main branch: `main` (stable, tested code)
 - Feature branches: `feature/description` (e.g., `feature/web-interface`)
-- Bug fixes: `fix/description` (e.g., `fix/i2c-timeout`)
-- Commit message format: `type: brief description` (e.g., `feat: add presence detection`, `fix: resolve WiFi reconnection`)
+- Bug fixes: `fix/description` (e.g., `fix/wifi-reconnect`)
+- Commit message format: `type: brief description` (e.g., `feat: add motion detection`, `fix: resolve WiFi reconnection`)
 - Test before committing to main branch
 
 ## Domain Context
 
-### mmWave Radar Technology
-- **FMCW (Frequency Modulated Continuous Wave)**: Enables distance and speed measurement without echo wait times
-- **24GHz ISM Band**: Industrial, Scientific, Medical frequency band for radar sensors
-- **Detection Range**:
-  - Presence: 1.2m - 8m
-  - Motion/Ranging: 1.2m - 12m
-  - Beam angle: 100° horizontal
-- **Environmental Resilience**: Unaffected by light, temperature, humidity, dust, or noise
-- **Advantages over PIR**: Detects static presence (people sitting/sleeping), not just movement
+### RCWL-0516 Microwave Radar Technology
+- **Doppler Radar**: Detects motion by measuring frequency shift of reflected microwaves
+- **Operating Frequency**: ~3.18 GHz (different from WiFi 2.4GHz, no interference)
+- **Detection Range**: 5-7 meters (typical indoor environment)
+- **Detection Angle**: 360° omnidirectional
+- **Output Signal**: Digital HIGH (3.3V) when motion detected, LOW when no motion
+- **Trigger Duration**: ~2-3 seconds HIGH after motion (retriggerable)
+- **Advantages**:
+  - Detects through non-metallic materials (walls, doors, plastic enclosures)
+  - Works in any lighting condition (unlike PIR)
+  - Works in any temperature (more reliable than PIR in hot environments)
+  - Detects any moving object (not just warm bodies)
 
-### I2C Communication
-- **Default Address**: 0x2A (alternative: 0x2B)
-- **Pull-up Resistors**: Requires 4.7kΩ on SDA and SCL lines
-- **Constraint**: Cannot use UART and I2C simultaneously
-- **ESP32 Pins**: GPIO 21 (SDA), GPIO 22 (SCL) - default I2C pins
+### Simple GPIO Interface
+- **No protocol required**: Just digitalRead() on the output pin
+- **No pull-up resistors needed**: Sensor has built-in circuitry
+- **No library needed**: Standard Arduino GPIO functions work
+- **No configuration required**: Sensor works out of the box
+
+### Optional Hardware Modifications
+The RCWL-0516 has solder pads on the back for optional modifications:
+- **C-TM**: Add capacitor to extend trigger time (0.2µF = 50s, 1µF = 250s)
+- **R-GN**: Add resistor to reduce range (1MΩ = 5m, 270kΩ = 1.5m)
+- **R-CDS**: Add LDR to disable in bright conditions
 
 ### ESP32 WiFi Patterns
 - Async web servers for non-blocking operation
 - WebSocket for real-time data streaming
 - HTML/CSS/JS served from SPIFFS or embedded strings
 - RESTful API endpoints for sensor data (JSON format)
-- Common patterns: sliders, toggles, gauges, real-time charts
+- Common patterns: status indicators, real-time charts
 
 ## Important Constraints
 - **Memory**: ESP32-WROOM-32 has 520KB SRAM, 4MB Flash - monitor heap usage
-- **I2C Speed**: Standard 100kHz or Fast Mode 400kHz
-- **Power**: 3.3V logic level for ESP32; sensor accepts 3.3V-5.5V
+- **Power**: RCWL-0516 requires 4-28V input (use ESP32 VIN pin, not 3.3V)
+- **3.3V Output**: Sensor provides regulated 3.3V output (100mA max) - don't use for input
 - **WiFi Range**: 2.4GHz only, typical indoor range ~50m
-- **Processing**: Avoid blocking operations in main loop - use FreeRTOS tasks if needed
+- **Processing**: Avoid blocking operations in main loop
 - **Sensor Limitations**:
-  - Detection range: 1.2m minimum, 12m maximum
-  - Cannot simultaneously detect through walls (metal/concrete attenuates signal)
-  - Sensitivity affected by target size and distance
+  - Detection range: 5-7m (not adjustable without hardware modification)
+  - Sensitivity: Fixed (not adjustable via software)
+  - Detects motion only (not static presence like mmWave sensors)
+  - Metal objects behind sensor can reduce performance (keep >1cm clearance)
+  - Mount rigidly to prevent vibration-induced false triggers
 
 ## External Dependencies
 
 ### Required Arduino Libraries
-- **DFRobot_C4001**: Official sensor library ([GitHub](https://github.com/cdjq/DFRobot_C4001))
-- **Wire**: I2C communication (built-in)
 - **WiFi**: ESP32 WiFi (built-in ESP32 core)
 - **ESPAsyncWebServer**: Async web server ([GitHub](https://github.com/me-no-dev/ESPAsyncWebServer))
 - **AsyncTCP**: Async TCP library for ESP32 ([GitHub](https://github.com/me-no-dev/AsyncTCP))
 
 ### Documentation Resources
-- DFRobot Wiki: [SEN0610 Documentation](https://wiki.dfrobot.com/SKU_SEN0610_Gravity_C4001_mmWave_Presence_Sensor_12m_I2C_UART)
-- ESP32 Examples: [Random Nerd Tutorials](https://randomnerdtutorials.com/projects-esp32/)
-- ESP32 Wiring Guide: [ESPBoards C4001 Guide](https://www.espboards.dev/sensors/c4001/)
+- Random Nerd Tutorials: [ESP32 RCWL-0516 Guide](https://randomnerdtutorials.com/esp32-rcwl-0516-arduino/)
+- Instructables: [All About RCWL-0516](https://www.instructables.com/All-About-RCWL-0516-Microwave-Radar-Motion-Sensor/)
+- GitHub: [RCWL-0516 Technical Info](https://github.com/jdesbonnet/RCWL-0516)
 
 ### Hardware Connections
-- **VCC** → 3.3V (or 5V)
-- **GND** → GND
-- **SDA** → GPIO 21 (with 4.7kΩ pull-up to 3.3V)
-- **SCL** → GPIO 22 (with 4.7kΩ pull-up to 3.3V)
+```
+RCWL-0516    ESP32
+---------    -----
+VIN      →   VIN (5V from USB)
+GND      →   GND
+OUT      →   GPIO 13 (or any digital input pin)
+3V3      →   (do not connect - this is an OUTPUT)
+CDS      →   (optional LDR connection)
+```
+
+**Important**: The sensor's VIN needs 4-28V. Use the ESP32's VIN pin (which provides 5V from USB) not the 3.3V pin.
