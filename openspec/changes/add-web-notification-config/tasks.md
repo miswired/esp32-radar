@@ -80,19 +80,32 @@ arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200
 - [x] Real-time web dashboard with auto-refresh
 - [x] REST API endpoints (/status, /config)
 - [x] JSON responses using ArduinoJson
+- [x] Motion filter (70% threshold over 1s window to reduce noise)
 - [x] WiFi self-tests
 - [x] All Stage 1 features preserved
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Sensor Pin | GPIO 13 |
+| LED Pin | GPIO 2 |
+| Trip Delay | 3 seconds |
+| Clear Timeout | 10 seconds |
+| Filter Threshold | 70% |
+| Filter Window | 1000ms (10 samples) |
 
 ### Web Interface
 - Dashboard at `/` with:
   - Current state display (color-coded)
-  - Motion indicator
+  - Motion indicator (filtered)
+  - Filter level vs threshold (e.g., "30 / 70%")
+  - Raw sensor state (HIGH/LOW)
   - Statistics (alarm events, motion events, uptime, heap)
   - Configuration display (trip delay, clear timeout)
   - WiFi info (mode, IP, RSSI)
 - REST API:
-  - `GET /status` - Current status as JSON
-  - `GET /config` - Current configuration as JSON
+  - `GET /status` - Current status as JSON (includes filter stats)
+  - `GET /config` - Current configuration as JSON (includes filter config)
 
 ### Libraries
 - ArduinoJson (install: `arduino-cli lib install "ArduinoJson"`)

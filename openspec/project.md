@@ -101,7 +101,7 @@ Motion must be continuously detected for the configured trip delay before the al
 
 **Configurable Parameters** (via web interface in later stages):
 - `tripDelay`: Seconds of sustained motion before alarm triggers (default: 3 seconds)
-- `clearTimeout`: Seconds of no motion before alarm clears (default: 30 seconds)
+- `clearTimeout`: Seconds of no motion before alarm clears (default: 10 seconds)
 
 ### Optional Hardware Modifications
 The RCWL-0516 has solder pads on the back for optional modifications:

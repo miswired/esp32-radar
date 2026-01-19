@@ -120,7 +120,9 @@ Raw Sensor → Motion Filter → Trip Delay → Alarm State
 
 The main dashboard shows:
 - **Current State**: IDLE, MOTION_PENDING, ALARM_ACTIVE, ALARM_CLEARING
-- **Motion Indicator**: Real-time sensor status
+- **Motion Indicator**: Real-time filtered motion status
+- **Filter Level**: Current percentage vs threshold (e.g., "30 / 70%")
+- **Raw Sensor**: Current raw sensor state (HIGH/LOW)
 - **Statistics**: Alarm events, motion events, uptime, free memory
 - **Configuration**: Trip delay, clear timeout
 - **WiFi Info**: Mode, IP address, signal strength
@@ -155,7 +157,7 @@ curl http://192.168.1.100/status
   "uptime": 3600,
   "freeHeap": 245000,
   "tripDelay": 3,
-  "clearTimeout": 30,
+  "clearTimeout": 10,
   "filterThreshold": 70,
   "wifiMode": "Station",
   "ipAddress": "192.168.1.100",
@@ -209,7 +211,7 @@ curl http://192.168.1.100/config
   "sensorPin": 13,
   "ledPin": 2,
   "tripDelaySeconds": 3,
-  "clearTimeoutSeconds": 30,
+  "clearTimeoutSeconds": 10,
   "pollIntervalMs": 100,
   "filterSampleCount": 10,
   "filterThresholdPercent": 70,
