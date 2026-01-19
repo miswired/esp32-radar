@@ -478,6 +478,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     <div class="nav-links">
       <a href="/" class="active">Dashboard</a>
       <a href="/settings">Settings</a>
+      <a href="/diag">Diagnostics</a>
       <a href="/api">API</a>
     </div>
   </nav>
@@ -752,6 +753,7 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
     <div class="nav-links">
       <a href="/">Dashboard</a>
       <a href="/settings" class="active">Settings</a>
+      <a href="/diag">Diagnostics</a>
       <a href="/api">API</a>
     </div>
   </nav>
@@ -1092,6 +1094,7 @@ const char API_HTML[] PROGMEM = R"rawliteral(
     <div class="nav-links">
       <a href="/">Dashboard</a>
       <a href="/settings">Settings</a>
+      <a href="/diag">Diagnostics</a>
       <a href="/api" class="active">API</a>
     </div>
   </nav>
@@ -1191,7 +1194,462 @@ const char API_HTML[] PROGMEM = R"rawliteral(
       <h3>Example</h3>
       <pre>curl -X POST http://192.168.1.100/reset</pre>
     </div>
+
+    <div class="card">
+      <h2>POST /test-notification</h2>
+      <p>Send a test notification. Optionally provide URL and method in request body.</p>
+
+      <div class="endpoint">
+        <span class="method post">POST</span>
+        <span class="url">/test-notification</span>
+      </div>
+
+      <h3>Request Fields (optional)</h3>
+      <table class="field-table">
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td>url</td><td>string</td><td>URL to test (uses saved URL if omitted)</td></tr>
+        <tr><td>method</td><td>integer</td><td>0 = GET, 1 = POST</td></tr>
+      </table>
+
+      <h3>Example</h3>
+      <pre>curl -X POST http://192.168.1.100/test-notification \
+  -H "Content-Type: application/json" \
+  -d '{"url": "http://example.com/webhook", "method": 1}'</pre>
+    </div>
+
+    <div class="card">
+      <h2>GET /logs</h2>
+      <p>Returns the event log (last 50 system events).</p>
+
+      <div class="endpoint">
+        <span class="method">GET</span>
+        <span class="url"><a href="/logs" target="_blank">/logs</a></span>
+      </div>
+
+      <h3>Response Fields</h3>
+      <table class="field-table">
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td>events</td><td>array</td><td>Array of event objects</td></tr>
+        <tr><td>events[].time</td><td>integer</td><td>Timestamp (millis since boot)</td></tr>
+        <tr><td>events[].uptime</td><td>string</td><td>Formatted uptime (HH:MM:SS)</td></tr>
+        <tr><td>events[].event</td><td>string</td><td>Event type name</td></tr>
+        <tr><td>events[].data</td><td>integer</td><td>Optional event data</td></tr>
+        <tr><td>count</td><td>integer</td><td>Number of events in log</td></tr>
+        <tr><td>maxSize</td><td>integer</td><td>Maximum log capacity (50)</td></tr>
+      </table>
+
+      <h3>Event Types</h3>
+      <table class="field-table">
+        <tr><th>Event</th><th>Data</th><th>Description</th></tr>
+        <tr><td>BOOT</td><td>heap size</td><td>System boot</td></tr>
+        <tr><td>WIFI_CONNECTED</td><td>RSSI</td><td>WiFi connected</td></tr>
+        <tr><td>WIFI_AP_MODE</td><td>-</td><td>Fallback to AP mode</td></tr>
+        <tr><td>ALARM_TRIGGERED</td><td>count</td><td>Alarm activated</td></tr>
+        <tr><td>ALARM_CLEARED</td><td>duration</td><td>Alarm cleared</td></tr>
+        <tr><td>NOTIFY_SENT</td><td>HTTP code</td><td>Notification sent</td></tr>
+        <tr><td>NOTIFY_FAILED</td><td>error code</td><td>Notification failed</td></tr>
+        <tr><td>CONFIG_SAVED</td><td>-</td><td>Config saved to NVS</td></tr>
+        <tr><td>FACTORY_RESET</td><td>-</td><td>Factory reset initiated</td></tr>
+        <tr><td>HEAP_LOW</td><td>heap size</td><td>Low memory warning</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>GET /diagnostics</h2>
+      <p>Returns comprehensive system diagnostics and health information.</p>
+
+      <div class="endpoint">
+        <span class="method">GET</span>
+        <span class="url"><a href="/diagnostics" target="_blank">/diagnostics</a></span>
+      </div>
+
+      <h3>Response Fields</h3>
+      <table class="field-table">
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td>uptime</td><td>integer</td><td>Milliseconds since boot</td></tr>
+        <tr><td>uptimeFormatted</td><td>string</td><td>Formatted uptime</td></tr>
+        <tr><td>freeHeap</td><td>integer</td><td>Current free heap (bytes)</td></tr>
+        <tr><td>minHeap</td><td>integer</td><td>Minimum heap seen</td></tr>
+        <tr><td>maxHeap</td><td>integer</td><td>Maximum heap seen</td></tr>
+        <tr><td>heapFragmentation</td><td>integer</td><td>Fragmentation percentage</td></tr>
+        <tr><td>watchdogEnabled</td><td>boolean</td><td>Watchdog timer status</td></tr>
+        <tr><td>watchdogTimeout</td><td>integer</td><td>Watchdog timeout (seconds)</td></tr>
+        <tr><td>heapHistory</td><td>array</td><td>Recent heap samples (1/min)</td></tr>
+        <tr><td>recentEvents</td><td>array</td><td>Last 10 events</td></tr>
+      </table>
+    </div>
   </div>
+</body>
+</html>
+)rawliteral";
+
+// ============================================================================
+// DIAGNOSTICS PAGE HTML (Stage 6)
+// ============================================================================
+
+const char DIAGNOSTICS_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagnostics - ESP32 Motion Sensor</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+    }
+    nav {
+      background: #0f0f1a;
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #16213e;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-brand {
+      color: #00d4ff;
+      font-weight: bold;
+      font-size: 18px;
+      text-decoration: none;
+    }
+    .nav-links {
+      display: flex;
+      gap: 20px;
+    }
+    .nav-links a {
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .nav-links a:hover {
+      color: #eee;
+      background: #16213e;
+    }
+    .nav-links a.active {
+      color: #00d4ff;
+      background: #16213e;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+    .card {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    .card h2 {
+      font-size: 16px;
+      color: #00d4ff;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+    }
+    .stat-item {
+      background: #1a1a2e;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .stat-label {
+      color: #888;
+      font-size: 12px;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+    .stat-value {
+      color: #eee;
+      font-size: 20px;
+      font-weight: bold;
+    }
+    .stat-value.good { color: #4ade80; }
+    .stat-value.warn { color: #fbbf24; }
+    .stat-value.bad { color: #ef4444; }
+    .log-container {
+      background: #1a1a2e;
+      border-radius: 8px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .log-entry {
+      padding: 10px 15px;
+      border-bottom: 1px solid #16213e;
+      display: flex;
+      gap: 15px;
+      font-size: 13px;
+    }
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+    .log-time {
+      color: #888;
+      font-family: monospace;
+      min-width: 80px;
+    }
+    .log-event {
+      color: #00d4ff;
+      font-weight: bold;
+      min-width: 140px;
+    }
+    .log-event.alarm { color: #ef4444; }
+    .log-event.notify { color: #4ade80; }
+    .log-event.wifi { color: #fbbf24; }
+    .log-event.system { color: #a78bfa; }
+    .log-data {
+      color: #aaa;
+    }
+    .empty-log {
+      padding: 30px;
+      text-align: center;
+      color: #666;
+    }
+    .refresh-btn {
+      background: #00d4ff;
+      color: #1a1a2e;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .refresh-btn:hover {
+      background: #00b8e6;
+    }
+    .auto-refresh {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #888;
+    }
+    .heap-bar {
+      background: #1a1a2e;
+      border-radius: 4px;
+      height: 20px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .heap-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4ade80, #fbbf24);
+      transition: width 0.3s;
+    }
+    .heap-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #888;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="nav-brand">ESP32 Radar</a>
+    <div class="nav-links">
+      <a href="/">Dashboard</a>
+      <a href="/settings">Settings</a>
+      <a href="/diag" class="active">Diagnostics</a>
+      <a href="/api">API</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="card">
+      <h2>
+        System Status
+        <div class="auto-refresh">
+          <input type="checkbox" id="autoRefresh" checked>
+          <label for="autoRefresh">Auto-refresh (5s)</label>
+        </div>
+      </h2>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-label">Uptime</div>
+          <div class="stat-value" id="uptime">--:--:--</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">State</div>
+          <div class="stat-value" id="state">---</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Alarms</div>
+          <div class="stat-value" id="alarms">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Notifications</div>
+          <div class="stat-value" id="notifications">0 / 0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">WiFi Signal</div>
+          <div class="stat-value" id="rssi">-- dBm</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Watchdog</div>
+          <div class="stat-value good" id="watchdog">---</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Memory</h2>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-label">Free Heap</div>
+          <div class="stat-value" id="freeHeap">--- KB</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Min Heap</div>
+          <div class="stat-value" id="minHeap">--- KB</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Max Heap</div>
+          <div class="stat-value" id="maxHeap">--- KB</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Fragmentation</div>
+          <div class="stat-value" id="fragmentation">--%</div>
+        </div>
+      </div>
+      <div class="heap-bar">
+        <div class="heap-bar-fill" id="heapBar" style="width: 80%"></div>
+      </div>
+      <div class="heap-labels">
+        <span>0 KB</span>
+        <span id="heapTotal">320 KB</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>
+        Event Log
+        <button class="refresh-btn" onclick="fetchLogs()">Refresh</button>
+      </h2>
+      <div class="log-container" id="logContainer">
+        <div class="empty-log">Loading events...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let refreshInterval;
+
+    function getEventClass(event) {
+      if (event.includes('ALARM')) return 'alarm';
+      if (event.includes('NOTIFY')) return 'notify';
+      if (event.includes('WIFI')) return 'wifi';
+      return 'system';
+    }
+
+    function formatData(event, data) {
+      if (!data) return '';
+      switch (event) {
+        case 'WIFI_CONNECTED': return data + ' dBm';
+        case 'ALARM_CLEARED': return data + 's duration';
+        case 'ALARM_TRIGGERED': return '#' + data;
+        case 'NOTIFY_SENT':
+        case 'NOTIFY_FAILED': return 'HTTP ' + data;
+        case 'BOOT':
+        case 'HEAP_LOW': return Math.round(data / 1024) + ' KB';
+        default: return data;
+      }
+    }
+
+    async function fetchDiagnostics() {
+      try {
+        const res = await fetch('/diagnostics');
+        const data = await res.json();
+
+        document.getElementById('uptime').textContent = data.uptimeFormatted;
+        document.getElementById('state').textContent = data.state;
+        document.getElementById('alarms').textContent = data.alarmEvents;
+        document.getElementById('notifications').textContent =
+          data.notificationsSent + ' / ' + data.notificationsFailed;
+        document.getElementById('rssi').textContent =
+          data.wifiConnected ? (data.rssi + ' dBm') : 'N/A';
+        document.getElementById('watchdog').textContent =
+          data.watchdogEnabled ? 'Active (' + data.watchdogTimeout + 's)' : 'Disabled';
+
+        const freeKB = Math.round(data.freeHeap / 1024);
+        const minKB = Math.round(data.minHeap / 1024);
+        const maxKB = Math.round(data.maxHeap / 1024);
+
+        document.getElementById('freeHeap').textContent = freeKB + ' KB';
+        document.getElementById('minHeap').textContent = minKB + ' KB';
+        document.getElementById('maxHeap').textContent = maxKB + ' KB';
+        document.getElementById('fragmentation').textContent = data.heapFragmentation + '%';
+
+        const heapPercent = (data.freeHeap / 327680) * 100;
+        document.getElementById('heapBar').style.width = heapPercent + '%';
+
+        const heapEl = document.getElementById('freeHeap');
+        heapEl.className = 'stat-value ' + (freeKB < 50 ? 'bad' : freeKB < 100 ? 'warn' : 'good');
+      } catch (e) {
+        console.error('Failed to fetch diagnostics:', e);
+      }
+    }
+
+    async function fetchLogs() {
+      try {
+        const res = await fetch('/logs');
+        const data = await res.json();
+        const container = document.getElementById('logContainer');
+
+        if (data.events.length === 0) {
+          container.innerHTML = '<div class="empty-log">No events logged yet</div>';
+          return;
+        }
+
+        // Show newest first
+        const events = data.events.reverse();
+        container.innerHTML = events.map(e => `
+          <div class="log-entry">
+            <span class="log-time">${e.uptime}</span>
+            <span class="log-event ${getEventClass(e.event)}">${e.event}</span>
+            <span class="log-data">${formatData(e.event, e.data)}</span>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error('Failed to fetch logs:', e);
+        document.getElementById('logContainer').innerHTML =
+          '<div class="empty-log">Failed to load events</div>';
+      }
+    }
+
+    function toggleAutoRefresh() {
+      if (document.getElementById('autoRefresh').checked) {
+        refreshInterval = setInterval(() => {
+          fetchDiagnostics();
+          fetchLogs();
+        }, 5000);
+      } else {
+        clearInterval(refreshInterval);
+      }
+    }
+
+    document.getElementById('autoRefresh').addEventListener('change', toggleAutoRefresh);
+
+    // Initial load
+    fetchDiagnostics();
+    fetchLogs();
+    toggleAutoRefresh();
+  </script>
 </body>
 </html>
 )rawliteral";
@@ -1520,6 +1978,10 @@ void handleSettings() {
 
 void handleApi() {
   server.send_P(200, "text/html", API_HTML);
+}
+
+void handleDiagPage() {
+  server.send_P(200, "text/html", DIAGNOSTICS_HTML);
 }
 
 void handleStatus() {
@@ -1894,6 +2356,7 @@ void handleNotFound() {
 void setupWebServer() {
   server.on("/", HTTP_GET, handleRoot);
   server.on("/settings", HTTP_GET, handleSettings);
+  server.on("/diag", HTTP_GET, handleDiagPage);
   server.on("/api", HTTP_GET, handleApi);
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/config", HTTP_GET, handleGetConfig);
