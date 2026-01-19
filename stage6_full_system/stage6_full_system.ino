@@ -162,6 +162,9 @@ uint32_t maxHeapSeen = 0;
 // Watchdog status
 bool watchdogEnabled = false;
 
+// Forward declaration for event logging
+void logEvent(EventType type, int32_t data = 0);
+
 // ============================================================================
 // WIFI CONFIGURATION
 // ============================================================================
@@ -1303,7 +1306,7 @@ int getRSSI() {
 // EVENT LOGGING FUNCTIONS (Stage 6)
 // ============================================================================
 
-void logEvent(EventType type, int32_t data = 0) {
+void logEvent(EventType type, int32_t data) {
   eventLog[eventLogHead].timestamp = millis();
   eventLog[eventLogHead].type = type;
   eventLog[eventLogHead].data = data;
@@ -1857,8 +1860,8 @@ void handleDiagnostics() {
 
   // Current state
   doc["state"] = stateNames[currentState];
-  doc["motionFiltered"] = motionFiltered;
-  doc["filterLevel"] = filterLevel;
+  doc["motionFiltered"] = filteredMotionDetected;
+  doc["filterLevel"] = currentFilterPercent;
 
   // Heap history
   JsonArray heapHist = doc["heapHistory"].to<JsonArray>();
