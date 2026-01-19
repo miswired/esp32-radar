@@ -8,6 +8,7 @@ This stage builds on Stage 1 and adds WiFi connectivity with AP fallback and a w
 - **AP Fallback Mode**: Creates its own network if WiFi connection fails
 - **Web Dashboard**: Real-time motion status display
 - **REST API**: JSON endpoints for status and configuration
+- **Motion Filter**: Noise reduction requiring sustained sensor readings
 - **WiFi Self-Tests**: Verify WiFi and web server functionality
 
 ## Prerequisites
@@ -69,6 +70,50 @@ AP mode activates automatically if:
 - WiFi connection fails after 15 seconds
 - WiFi network is not available
 
+## Motion Filter
+
+The RCWL-0516 sensor can be noisy, triggering on small movements or interference. The motion filter reduces false positives by requiring a **percentage of positive readings** over a sliding time window before reporting motion.
+
+### How It Works
+
+1. Sensor is sampled at 10Hz (every 100ms)
+2. Last 10 samples are kept in a circular buffer (1 second window)
+3. Motion is only reported if **70% or more** of samples are HIGH
+4. This filters out brief noise spikes while still detecting sustained motion
+
+### Filter Configuration
+
+Edit these values in `stage2_wifi_web.ino` to tune sensitivity:
+
+```cpp
+#define FILTER_SAMPLE_COUNT 10          // Number of samples in window
+#define FILTER_THRESHOLD_PERCENT 70     // % of samples that must be HIGH
+#define FILTER_WINDOW_MS 1000           // Time window in milliseconds
+```
+
+### Tuning Guide
+
+| Scenario | Adjustment |
+|----------|------------|
+| Too many false triggers | Increase `FILTER_THRESHOLD_PERCENT` (e.g., 80-90%) |
+| Missing real motion | Decrease `FILTER_THRESHOLD_PERCENT` (e.g., 50-60%) |
+| Need faster response | Decrease `FILTER_WINDOW_MS` (e.g., 500ms) |
+| Need more stability | Increase `FILTER_WINDOW_MS` (e.g., 2000ms) |
+
+### Detection Pipeline
+
+The full detection pipeline with filter:
+
+```
+Raw Sensor → Motion Filter → Trip Delay → Alarm State
+   10Hz        70% threshold    3 seconds    Active/Clearing
+```
+
+1. **Raw Sensor**: Reads HIGH/LOW at 10Hz
+2. **Motion Filter**: Requires 70% HIGH over 1 second
+3. **Trip Delay**: Filtered motion must sustain 3 seconds
+4. **Alarm State**: Triggers notifications (future stages)
+
 ## Web Interface
 
 ### Dashboard (`/`)
@@ -103,12 +148,15 @@ curl http://192.168.1.100/status
 {
   "state": "IDLE",
   "rawMotion": false,
+  "filteredMotion": false,
+  "filterPercent": 20,
   "alarmEvents": 5,
   "motionEvents": 12,
   "uptime": 3600,
   "freeHeap": 245000,
   "tripDelay": 3,
   "clearTimeout": 30,
+  "filterThreshold": 70,
   "wifiMode": "Station",
   "ipAddress": "192.168.1.100",
   "rssi": -45
@@ -120,13 +168,16 @@ curl http://192.168.1.100/status
 | Field | Type | Description |
 |-------|------|-------------|
 | `state` | string | Current state machine state (see below) |
-| `rawMotion` | boolean | `true` if sensor currently detects motion |
+| `rawMotion` | boolean | `true` if raw sensor currently reads HIGH |
+| `filteredMotion` | boolean | `true` if filtered motion detected (used by state machine) |
+| `filterPercent` | integer | Current percentage of positive samples (0-100) |
 | `alarmEvents` | integer | Total number of alarm triggers since boot |
 | `motionEvents` | integer | Total motion detection events since boot |
 | `uptime` | integer | Seconds since ESP32 boot |
 | `freeHeap` | integer | Available heap memory in bytes |
 | `tripDelay` | integer | Seconds motion must sustain before alarm |
 | `clearTimeout` | integer | Seconds without motion before alarm clears |
+| `filterThreshold` | integer | Percentage threshold for filtered motion |
 | `wifiMode` | string | `"Station"` or `"AP Mode"` |
 | `ipAddress` | string | Current IP address |
 | `rssi` | integer | WiFi signal strength in dBm (0 in AP mode) |
@@ -160,6 +211,9 @@ curl http://192.168.1.100/config
   "tripDelaySeconds": 3,
   "clearTimeoutSeconds": 30,
   "pollIntervalMs": 100,
+  "filterSampleCount": 10,
+  "filterThresholdPercent": 70,
+  "filterWindowMs": 1000,
   "wifiSsid": "MyNetwork",
   "wifiMode": "Station",
   "apSsid": "ESP32-Radar-Setup",
@@ -176,6 +230,9 @@ curl http://192.168.1.100/config
 | `tripDelaySeconds` | integer | Motion duration before alarm triggers |
 | `clearTimeoutSeconds` | integer | No-motion duration before alarm clears |
 | `pollIntervalMs` | integer | Sensor polling rate in milliseconds |
+| `filterSampleCount` | integer | Number of samples in filter window |
+| `filterThresholdPercent` | integer | Percentage threshold for motion detection |
+| `filterWindowMs` | integer | Filter time window in milliseconds |
 | `wifiSsid` | string | Connected WiFi network name |
 | `wifiMode` | string | `"Station"` or `"AP Mode"` |
 | `apSsid` | string | Access point SSID (when in AP mode) |
