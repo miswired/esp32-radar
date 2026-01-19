@@ -84,8 +84,21 @@ The dashboard auto-refreshes every second.
 
 ### REST API Endpoints
 
+The ESP32 provides a REST API for integration with home automation systems, scripts, or custom applications.
+
+---
+
 #### GET `/status`
-Returns current status as JSON:
+
+Returns the current motion detection status and system metrics.
+
+**Request:**
+```bash
+curl http://192.168.1.100/status
+```
+
+**Response:** `200 OK` with `Content-Type: application/json`
+
 ```json
 {
   "state": "IDLE",
@@ -102,8 +115,44 @@ Returns current status as JSON:
 }
 ```
 
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `state` | string | Current state machine state (see below) |
+| `rawMotion` | boolean | `true` if sensor currently detects motion |
+| `alarmEvents` | integer | Total number of alarm triggers since boot |
+| `motionEvents` | integer | Total motion detection events since boot |
+| `uptime` | integer | Seconds since ESP32 boot |
+| `freeHeap` | integer | Available heap memory in bytes |
+| `tripDelay` | integer | Seconds motion must sustain before alarm |
+| `clearTimeout` | integer | Seconds without motion before alarm clears |
+| `wifiMode` | string | `"Station"` or `"AP Mode"` |
+| `ipAddress` | string | Current IP address |
+| `rssi` | integer | WiFi signal strength in dBm (0 in AP mode) |
+
+**State Values:**
+
+| State | Description |
+|-------|-------------|
+| `IDLE` | No motion detected, system waiting |
+| `MOTION_PENDING` | Motion detected, waiting for trip delay |
+| `ALARM_ACTIVE` | Alarm triggered, motion sustained past trip delay |
+| `ALARM_CLEARING` | Motion stopped, waiting for clear timeout |
+
+---
+
 #### GET `/config`
-Returns configuration as JSON:
+
+Returns the current system configuration.
+
+**Request:**
+```bash
+curl http://192.168.1.100/config
+```
+
+**Response:** `200 OK` with `Content-Type: application/json`
+
 ```json
 {
   "sensorPin": 13,
@@ -117,6 +166,92 @@ Returns configuration as JSON:
   "ipAddress": "192.168.1.100"
 }
 ```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sensorPin` | integer | GPIO pin connected to RCWL-0516 OUT |
+| `ledPin` | integer | GPIO pin for status LED |
+| `tripDelaySeconds` | integer | Motion duration before alarm triggers |
+| `clearTimeoutSeconds` | integer | No-motion duration before alarm clears |
+| `pollIntervalMs` | integer | Sensor polling rate in milliseconds |
+| `wifiSsid` | string | Connected WiFi network name |
+| `wifiMode` | string | `"Station"` or `"AP Mode"` |
+| `apSsid` | string | Access point SSID (when in AP mode) |
+| `ipAddress` | string | Current IP address |
+
+---
+
+### API Usage Examples
+
+#### Poll status every 5 seconds (bash)
+```bash
+while true; do
+  curl -s http://192.168.1.100/status | jq '.state, .rawMotion'
+  sleep 5
+done
+```
+
+#### Check if alarm is active (bash)
+```bash
+STATE=$(curl -s http://192.168.1.100/status | jq -r '.state')
+if [ "$STATE" = "ALARM_ACTIVE" ]; then
+  echo "ALARM!"
+fi
+```
+
+#### Python integration example
+```python
+import requests
+import time
+
+ESP32_IP = "192.168.1.100"
+
+def get_motion_status():
+    response = requests.get(f"http://{ESP32_IP}/status")
+    return response.json()
+
+# Monitor for alarm events
+last_alarm_count = 0
+while True:
+    status = get_motion_status()
+    if status["alarmEvents"] > last_alarm_count:
+        print(f"New alarm triggered! Total: {status['alarmEvents']}")
+        last_alarm_count = status["alarmEvents"]
+    time.sleep(1)
+```
+
+#### Home Assistant REST sensor
+```yaml
+# configuration.yaml
+sensor:
+  - platform: rest
+    name: "Motion Sensor State"
+    resource: http://192.168.1.100/status
+    value_template: "{{ value_json.state }}"
+    scan_interval: 1
+
+  - platform: rest
+    name: "Motion Detected"
+    resource: http://192.168.1.100/status
+    value_template: "{{ value_json.rawMotion }}"
+    scan_interval: 1
+
+binary_sensor:
+  - platform: template
+    sensors:
+      radar_motion:
+        friendly_name: "Radar Motion"
+        value_template: "{{ states('sensor.motion_detected') == 'true' }}"
+```
+
+#### Node-RED HTTP request
+```
+[Inject] -> [HTTP Request: GET http://192.168.1.100/status] -> [JSON Parser] -> [Switch: msg.payload.state]
+```
+
+---
 
 ## Serial Commands
 
