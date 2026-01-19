@@ -7,7 +7,8 @@ This stage builds on Stage 4 and adds comprehensive monitoring, logging, and sys
 - **Event Logging**: Circular buffer storing last 50 system events
 - **Watchdog Timer**: 30-second hardware watchdog for system stability
 - **Memory Monitoring**: Heap tracking with min/max history over time
-- **Diagnostics API**: New `/diagnostics` and `/logs` endpoints
+- **Diagnostics Page**: Web-based diagnostics dashboard at `/diag`
+- **Diagnostics API**: New `/diagnostics` and `/logs` JSON endpoints
 - **Enhanced Serial Commands**: New `l` (logs) and `d` (diagnostics) commands
 
 ## Prerequisites
@@ -153,13 +154,35 @@ All Stage 4 commands, plus:
 ## Web Interface
 
 All pages include navigation bar with links to:
-- **Dashboard** (`/`) - Real-time status
+- **Dashboard** (`/`) - Real-time motion status
 - **Settings** (`/settings`) - Configuration
+- **Diagnostics** (`/diag`) - System health and event log
 - **API** (`/api`) - API documentation
 
-New JSON endpoints available:
-- **Logs** (`/logs`) - Event log
-- **Diagnostics** (`/diagnostics`) - System health
+### Diagnostics Page (`/diag`)
+
+The diagnostics page provides real-time system monitoring:
+
+**System Status**
+- Uptime, current state, alarm count
+- Notifications sent/failed
+- WiFi signal strength (RSSI)
+- Watchdog timer status
+
+**Memory Monitoring**
+- Free, min, and max heap with visual bar
+- Fragmentation percentage
+- Color-coded warnings (green/yellow/red)
+
+**Event Log**
+- Color-coded events (alarm=red, notify=green, wifi=yellow, system=purple)
+- Newest events shown first
+- Auto-refresh every 5 seconds (toggleable)
+- Manual refresh button
+
+### JSON API Endpoints
+- **`/logs`** - Full event log as JSON
+- **`/diagnostics`** - System diagnostics as JSON
 
 ## Compilation and Upload
 
