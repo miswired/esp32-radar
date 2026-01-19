@@ -54,7 +54,7 @@
 // ============================================================================
 
 #define TRIP_DELAY_SECONDS 3
-#define CLEAR_TIMEOUT_SECONDS 30
+#define CLEAR_TIMEOUT_SECONDS 10
 #define TRIP_DELAY_MS (TRIP_DELAY_SECONDS * 1000)
 #define CLEAR_TIMEOUT_MS (CLEAR_TIMEOUT_SECONDS * 1000)
 
@@ -243,8 +243,8 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       </div>
       <div class="stats">
         <div class="stat">
-          <div class="stat-value" id="filterPercent">0%</div>
-          <div class="stat-label">Filter Level</div>
+          <div class="stat-value"><span id="filterPercent">0</span> / <span id="filterThreshold">70</span>%</div>
+          <div class="stat-label">Filter Level / Threshold</div>
         </div>
         <div class="stat">
           <div class="stat-value" id="rawMotion">--</div>
@@ -319,7 +319,8 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           }
 
           // Update filter stats
-          document.getElementById('filterPercent').textContent = data.filterPercent + '%';
+          document.getElementById('filterPercent').textContent = data.filterPercent;
+          document.getElementById('filterThreshold').textContent = data.filterThreshold;
           document.getElementById('rawMotion').textContent = data.rawMotion ? 'HIGH' : 'LOW';
 
           // Update stats
