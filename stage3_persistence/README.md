@@ -7,7 +7,9 @@ This stage builds on Stage 2 and adds persistent storage using the ESP32's NVS (
 - **NVS Storage**: Configuration persists across reboots using ESP32 Preferences library
 - **Persistent WiFi Credentials**: WiFi SSID and password stored in NVS
 - **Persistent Settings**: Trip delay, clear timeout, and filter threshold saved to flash
+- **Navigation Bar**: Sticky top navigation on all pages for easy access
 - **Web Settings Page**: New `/settings` page for configuring the device
+- **API Documentation Page**: New `/api` page with REST API documentation
 - **POST /config API**: Save configuration via REST API
 - **POST /reset API**: Factory reset endpoint
 - **Serial Factory Reset**: Press 'f' in serial monitor for factory reset
@@ -61,9 +63,16 @@ Same as Stage 1 and 2:
 
 ## Web Interface
 
+All pages include a sticky navigation bar with links to Dashboard, Settings, and API documentation.
+
 ### Dashboard (`/`)
 
-Same as Stage 2, plus a "Settings" link at the bottom.
+Real-time motion detection status display with:
+- Current state (IDLE, MOTION_PENDING, ALARM_ACTIVE, ALARM_CLEARING)
+- Motion indicator with filter level and threshold
+- Statistics (alarm events, motion events, uptime, memory)
+- Current configuration display
+- WiFi connection info
 
 ### Settings Page (`/settings`)
 
@@ -71,6 +80,14 @@ Same as Stage 2, plus a "Settings" link at the bottom.
 - **Motion Detection**: Adjust trip delay, clear timeout, and filter threshold
 - **Save Settings**: Saves to NVS (restarts if WiFi changed)
 - **Factory Reset**: Clears all settings and restores defaults
+
+### API Documentation Page (`/api`)
+
+Built-in documentation for all REST API endpoints with:
+- Endpoint descriptions and methods
+- Request/response field tables
+- Clickable links to GET endpoints (view live JSON)
+- curl examples for POST endpoints
 
 ### REST API Endpoints
 
@@ -80,6 +97,7 @@ All Stage 2 endpoints are preserved:
 |--------|----------|-------------|
 | GET | `/` | Dashboard |
 | GET | `/settings` | Settings page |
+| GET | `/api` | API documentation |
 | GET | `/status` | JSON status |
 | GET | `/config` | JSON configuration |
 | POST | `/config` | Save configuration |

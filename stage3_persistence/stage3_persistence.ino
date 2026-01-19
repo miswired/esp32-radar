@@ -277,14 +277,45 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       background: #1a1a2e;
       color: #eee;
       min-height: 100vh;
-      padding: 20px;
     }
-    .container { max-width: 600px; margin: 0 auto; }
-    h1 {
-      text-align: center;
-      margin-bottom: 30px;
+    nav {
+      background: #0f0f1a;
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #16213e;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-brand {
       color: #00d4ff;
+      font-weight: bold;
+      font-size: 18px;
+      text-decoration: none;
     }
+    .nav-links {
+      display: flex;
+      gap: 20px;
+    }
+    .nav-links a {
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .nav-links a:hover {
+      color: #eee;
+      background: #16213e;
+    }
+    .nav-links a.active {
+      color: #00d4ff;
+      background: #16213e;
+    }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
     .card {
       background: #16213e;
       border-radius: 12px;
@@ -348,20 +379,19 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     }
     .motion-indicator.active { background: #ef4444; }
     .motion-indicator.inactive { background: #4ade80; }
-    .config-link {
-      display: block;
-      text-align: center;
-      margin-top: 20px;
-      color: #00d4ff;
-      text-decoration: none;
-    }
-    .config-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>ESP32 Motion Sensor</h1>
+  <nav>
+    <a href="/" class="nav-brand">ESP32 Radar</a>
+    <div class="nav-links">
+      <a href="/" class="active">Dashboard</a>
+      <a href="/settings">Settings</a>
+      <a href="/api">API</a>
+    </div>
+  </nav>
 
+  <div class="container">
     <div class="card">
       <h2>Current State</h2>
       <div class="status" id="state">Loading...</div>
@@ -420,8 +450,6 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         </div>
       </div>
     </div>
-
-    <a href="/settings" class="config-link">Settings</a>
 
     <div class="wifi-info">
       <span id="wifiInfo">Connecting...</span>
@@ -509,14 +537,45 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
       background: #1a1a2e;
       color: #eee;
       min-height: 100vh;
-      padding: 20px;
     }
-    .container { max-width: 600px; margin: 0 auto; }
-    h1 {
-      text-align: center;
-      margin-bottom: 30px;
+    nav {
+      background: #0f0f1a;
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #16213e;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-brand {
       color: #00d4ff;
+      font-weight: bold;
+      font-size: 18px;
+      text-decoration: none;
     }
+    .nav-links {
+      display: flex;
+      gap: 20px;
+    }
+    .nav-links a {
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .nav-links a:hover {
+      color: #eee;
+      background: #16213e;
+    }
+    .nav-links a.active {
+      color: #00d4ff;
+      background: #16213e;
+    }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
     .card {
       background: #16213e;
       border-radius: 12px;
@@ -575,11 +634,6 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
       color: #fff;
     }
     .btn-danger:hover { background: #dc2626; }
-    .btn-secondary {
-      background: #4b5563;
-      color: #fff;
-    }
-    .btn-secondary:hover { background: #374151; }
     .message {
       padding: 12px;
       border-radius: 8px;
@@ -588,14 +642,6 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
     }
     .message.success { background: #065f46; display: block; }
     .message.error { background: #991b1b; display: block; }
-    .back-link {
-      display: block;
-      text-align: center;
-      margin-top: 20px;
-      color: #00d4ff;
-      text-decoration: none;
-    }
-    .back-link:hover { text-decoration: underline; }
     .hint {
       font-size: 12px;
       color: #666;
@@ -610,9 +656,16 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Settings</h1>
+  <nav>
+    <a href="/" class="nav-brand">ESP32 Radar</a>
+    <div class="nav-links">
+      <a href="/">Dashboard</a>
+      <a href="/settings" class="active">Settings</a>
+      <a href="/api">API</a>
+    </div>
+  </nav>
 
+  <div class="container">
     <div id="message" class="message"></div>
 
     <form id="settingsForm">
@@ -653,8 +706,6 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
         <button type="button" class="btn btn-danger" id="resetBtn">Factory Reset</button>
       </div>
     </form>
-
-    <a href="/" class="back-link">Back to Dashboard</a>
   </div>
 
   <script>
@@ -719,6 +770,268 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
       }
     });
   </script>
+</body>
+</html>
+)rawliteral";
+
+// ============================================================================
+// HTML API DOCUMENTATION PAGE
+// ============================================================================
+
+const char API_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API - ESP32 Motion Sensor</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+    }
+    nav {
+      background: #0f0f1a;
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #16213e;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-brand {
+      color: #00d4ff;
+      font-weight: bold;
+      font-size: 18px;
+      text-decoration: none;
+    }
+    .nav-links {
+      display: flex;
+      gap: 20px;
+    }
+    .nav-links a {
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .nav-links a:hover {
+      color: #eee;
+      background: #16213e;
+    }
+    .nav-links a.active {
+      color: #00d4ff;
+      background: #16213e;
+    }
+    .container { max-width: 700px; margin: 0 auto; padding: 20px; }
+    .card {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    .card h2 {
+      font-size: 16px;
+      color: #00d4ff;
+      margin-bottom: 15px;
+    }
+    .card h3 {
+      font-size: 14px;
+      color: #888;
+      margin: 15px 0 10px 0;
+      text-transform: uppercase;
+    }
+    .endpoint {
+      background: #1a1a2e;
+      padding: 12px 15px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      font-family: monospace;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .method {
+      background: #00d4ff;
+      color: #1a1a2e;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 12px;
+    }
+    .method.post {
+      background: #4ade80;
+    }
+    .url {
+      color: #eee;
+    }
+    .url a {
+      color: #00d4ff;
+      text-decoration: none;
+    }
+    .url a:hover {
+      text-decoration: underline;
+    }
+    p {
+      color: #aaa;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+    code {
+      background: #1a1a2e;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #00d4ff;
+    }
+    pre {
+      background: #1a1a2e;
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #aaa;
+    }
+    .field-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 13px;
+    }
+    .field-table th {
+      text-align: left;
+      padding: 8px;
+      background: #1a1a2e;
+      color: #888;
+      font-weight: normal;
+    }
+    .field-table td {
+      padding: 8px;
+      border-top: 1px solid #1a1a2e;
+      color: #aaa;
+    }
+    .field-table td:first-child {
+      color: #00d4ff;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="nav-brand">ESP32 Radar</a>
+    <div class="nav-links">
+      <a href="/">Dashboard</a>
+      <a href="/settings">Settings</a>
+      <a href="/api" class="active">API</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="card">
+      <h2>REST API Endpoints</h2>
+      <p>The ESP32 Motion Sensor provides a REST API for integration with home automation systems, scripts, or custom applications.</p>
+    </div>
+
+    <div class="card">
+      <h2>GET /status</h2>
+      <p>Returns current motion detection status and system metrics.</p>
+
+      <div class="endpoint">
+        <span class="method">GET</span>
+        <span class="url"><a href="/status" target="_blank">/status</a></span>
+      </div>
+
+      <h3>Response Fields</h3>
+      <table class="field-table">
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td>state</td><td>string</td><td>IDLE, MOTION_PENDING, ALARM_ACTIVE, ALARM_CLEARING</td></tr>
+        <tr><td>rawMotion</td><td>boolean</td><td>Raw sensor state (true = HIGH)</td></tr>
+        <tr><td>filteredMotion</td><td>boolean</td><td>Filtered motion (used by state machine)</td></tr>
+        <tr><td>filterPercent</td><td>integer</td><td>Current filter level (0-100%)</td></tr>
+        <tr><td>alarmEvents</td><td>integer</td><td>Total alarm triggers since boot</td></tr>
+        <tr><td>motionEvents</td><td>integer</td><td>Total motion detections since boot</td></tr>
+        <tr><td>uptime</td><td>integer</td><td>Seconds since boot</td></tr>
+        <tr><td>freeHeap</td><td>integer</td><td>Available memory (bytes)</td></tr>
+        <tr><td>tripDelay</td><td>integer</td><td>Trip delay setting (seconds)</td></tr>
+        <tr><td>clearTimeout</td><td>integer</td><td>Clear timeout setting (seconds)</td></tr>
+        <tr><td>filterThreshold</td><td>integer</td><td>Filter threshold (%)</td></tr>
+        <tr><td>wifiMode</td><td>string</td><td>Station or AP Mode</td></tr>
+        <tr><td>ipAddress</td><td>string</td><td>Current IP address</td></tr>
+        <tr><td>rssi</td><td>integer</td><td>WiFi signal strength (dBm)</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>GET /config</h2>
+      <p>Returns current system configuration.</p>
+
+      <div class="endpoint">
+        <span class="method">GET</span>
+        <span class="url"><a href="/config" target="_blank">/config</a></span>
+      </div>
+
+      <h3>Response Fields</h3>
+      <table class="field-table">
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td>sensorPin</td><td>integer</td><td>GPIO pin for sensor</td></tr>
+        <tr><td>ledPin</td><td>integer</td><td>GPIO pin for LED</td></tr>
+        <tr><td>tripDelaySeconds</td><td>integer</td><td>Trip delay (seconds)</td></tr>
+        <tr><td>clearTimeoutSeconds</td><td>integer</td><td>Clear timeout (seconds)</td></tr>
+        <tr><td>filterThresholdPercent</td><td>integer</td><td>Filter threshold (%)</td></tr>
+        <tr><td>wifiSsid</td><td>string</td><td>Connected WiFi network</td></tr>
+        <tr><td>wifiMode</td><td>string</td><td>Station or AP Mode</td></tr>
+        <tr><td>ipAddress</td><td>string</td><td>Current IP address</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>POST /config</h2>
+      <p>Save configuration settings. Send JSON body with fields to update.</p>
+
+      <div class="endpoint">
+        <span class="method post">POST</span>
+        <span class="url">/config</span>
+      </div>
+
+      <h3>Request Fields (all optional)</h3>
+      <table class="field-table">
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td>wifiSsid</td><td>string</td><td>New WiFi SSID (triggers restart)</td></tr>
+        <tr><td>wifiPassword</td><td>string</td><td>New WiFi password (triggers restart)</td></tr>
+        <tr><td>tripDelay</td><td>integer</td><td>Trip delay 1-60 seconds</td></tr>
+        <tr><td>clearTimeout</td><td>integer</td><td>Clear timeout 1-300 seconds</td></tr>
+        <tr><td>filterThreshold</td><td>integer</td><td>Filter threshold 10-100%</td></tr>
+      </table>
+
+      <h3>Example</h3>
+      <pre>curl -X POST http://192.168.1.100/config \
+  -H "Content-Type: application/json" \
+  -d '{"tripDelay": 5, "filterThreshold": 80}'</pre>
+    </div>
+
+    <div class="card">
+      <h2>POST /reset</h2>
+      <p>Factory reset - clears all saved settings and restarts device.</p>
+
+      <div class="endpoint">
+        <span class="method post">POST</span>
+        <span class="url">/reset</span>
+      </div>
+
+      <h3>Example</h3>
+      <pre>curl -X POST http://192.168.1.100/reset</pre>
+    </div>
+  </div>
 </body>
 </html>
 )rawliteral";
@@ -895,6 +1208,10 @@ void handleSettings() {
   server.send_P(200, "text/html", SETTINGS_HTML);
 }
 
+void handleApi() {
+  server.send_P(200, "text/html", API_HTML);
+}
+
 void handleStatus() {
   JsonDocument doc;
 
@@ -1047,6 +1364,7 @@ void handleNotFound() {
 void setupWebServer() {
   server.on("/", HTTP_GET, handleRoot);
   server.on("/settings", HTTP_GET, handleSettings);
+  server.on("/api", HTTP_GET, handleApi);
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/config", HTTP_GET, handleGetConfig);
   server.on("/config", HTTP_POST, handlePostConfig);

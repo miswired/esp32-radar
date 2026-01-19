@@ -122,7 +122,9 @@ arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200
 - [x] Persistent WiFi credentials (SSID and password)
 - [x] Persistent trip delay and clear timeout settings
 - [x] Persistent filter threshold setting
+- [x] Sticky navigation bar on all pages
 - [x] Web UI form for configuration changes (`/settings` page)
+- [x] API documentation page (`/api`)
 - [x] `POST /config` endpoint to save settings
 - [x] `POST /reset` endpoint for factory reset
 - [x] Serial command 'f' for factory reset
@@ -139,8 +141,10 @@ arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200
 | Filter Threshold | 10-100% | 70 |
 
 ### Web Interface
-- Dashboard at `/` with Settings link
+- Navigation bar on all pages (Dashboard, Settings, API)
+- Dashboard at `/` with real-time status
 - Settings page at `/settings` with configuration form
+- API documentation at `/api` with endpoint details
 - REST API:
   - `GET /status` - Current status as JSON
   - `GET /config` - Current configuration as JSON
