@@ -819,13 +819,26 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
       });
     });
 
-    // Test notification
+    // Test notification - sends current form values (not saved config)
     document.getElementById('testNotifyBtn').addEventListener('click', function() {
       const statusEl = document.getElementById('notifyStatus');
+      const url = document.getElementById('notifyUrl').value.trim();
+      const method = parseInt(document.getElementById('notifyMethod').value);
+
+      if (!url) {
+        statusEl.style.color = '#ef4444';
+        statusEl.textContent = 'Please enter a notification URL first';
+        return;
+      }
+
       statusEl.textContent = 'Sending test notification...';
       statusEl.style.color = '#888';
 
-      fetch('/test-notification', { method: 'POST' })
+      fetch('/test-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: url, method: method })
+      })
         .then(response => response.json())
         .then(data => {
           if (data.success) {
@@ -1573,25 +1586,91 @@ void handleReset() {
 }
 
 void handleTestNotification() {
-  if (strlen(config.notifyUrl) == 0) {
-    server.send(400, "application/json", "{\"success\":false,\"message\":\"No notification URL configured\"}");
-    return;
-  }
-
   if (currentWiFiMode != MODE_STATION) {
     server.send(400, "application/json", "{\"success\":false,\"message\":\"Not connected to WiFi\"}");
     return;
   }
 
-  sendTestNotification();
+  // Check if URL and method are provided in request body (for testing unsaved values)
+  String testUrl = config.notifyUrl;
+  uint8_t testMethod = config.notifyMethod;
 
-  JsonDocument doc;
-  doc["success"] = (lastNotificationStatus >= 200 && lastNotificationStatus < 300);
-  doc["httpCode"] = lastNotificationStatus;
-  doc["message"] = lastNotificationStatus > 0 ? "Notification sent" : "Request failed";
+  if (server.hasArg("plain")) {
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, server.arg("plain"));
+    if (!error) {
+      if (doc.containsKey("url") && strlen(doc["url"]) > 0) {
+        testUrl = doc["url"].as<String>();
+      }
+      if (doc.containsKey("method")) {
+        testMethod = doc["method"];
+      }
+    }
+  }
+
+  if (testUrl.length() == 0) {
+    server.send(400, "application/json", "{\"success\":false,\"message\":\"No notification URL provided\"}");
+    return;
+  }
+
+  // Send test notification with provided or saved settings
+  Serial.println("[NOTIFY] Sending test notification...");
+  Serial.print("[NOTIFY] URL: ");
+  Serial.println(testUrl);
+  Serial.print("[NOTIFY] Method: ");
+  Serial.println(testMethod == NOTIFY_METHOD_GET ? "GET" : "POST");
+
+  HTTPClient http;
+  http.setTimeout(5000);
+
+  int httpCode = -1;
+
+  if (testMethod == NOTIFY_METHOD_GET) {
+    String url = testUrl;
+    if (url.indexOf('?') == -1) {
+      url += "?";
+    } else {
+      url += "&";
+    }
+    url += "event=test&state=" + String(stateNames[currentState]) + "&ip=" + getIPAddress();
+    http.begin(url);
+    httpCode = http.GET();
+  } else {
+    http.begin(testUrl);
+    http.addHeader("Content-Type", "application/json");
+
+    JsonDocument payload;
+    payload["event"] = "test";
+    payload["state"] = stateNames[currentState];
+    payload["ip"] = getIPAddress();
+    payload["uptime"] = millis() / 1000;
+    payload["alarmEvents"] = totalAlarmEvents;
+
+    String body;
+    serializeJson(payload, body);
+    httpCode = http.POST(body);
+  }
+
+  http.end();
+
+  lastNotificationTime = millis();
+  lastNotificationStatus = httpCode;
+
+  if (httpCode > 0) {
+    Serial.print("[NOTIFY] Response: ");
+    Serial.println(httpCode);
+  } else {
+    Serial.print("[NOTIFY] Error: ");
+    Serial.println(httpCode);
+  }
+
+  JsonDocument respDoc;
+  respDoc["success"] = (httpCode >= 200 && httpCode < 300);
+  respDoc["httpCode"] = httpCode;
+  respDoc["message"] = httpCode > 0 ? "Notification sent" : "Request failed";
 
   String response;
-  serializeJson(doc, response);
+  serializeJson(respDoc, response);
   server.send(200, "application/json", response);
 }
 

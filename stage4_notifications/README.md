@@ -136,7 +136,7 @@ The Settings page now includes a Notifications section:
 - Enable/disable checkbox
 - URL input field
 - Method dropdown (GET/POST)
-- Test Notification button with status feedback
+- Test Notification button with status feedback (tests current form values without saving)
 
 ## REST API
 
@@ -153,12 +153,26 @@ The Settings page now includes a Notifications section:
 
 #### POST `/test-notification`
 
-Sends a test notification using current URL and method settings.
+Sends a test notification. Can optionally specify URL and method in the request body, otherwise uses saved configuration.
 
-**Request:**
+**Request (with custom URL/method):**
+```bash
+curl -X POST http://192.168.1.100/test-notification \
+  -H "Content-Type: application/json" \
+  -d '{"url": "http://example.com/webhook", "method": 1}'
+```
+
+**Request (using saved settings):**
 ```bash
 curl -X POST http://192.168.1.100/test-notification
 ```
+
+**Request Fields (optional):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `url` | string | URL to send test notification to |
+| `method` | integer | 0 = GET, 1 = POST |
 
 **Response:**
 ```json
