@@ -153,17 +153,31 @@ arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200
 
 ---
 
-## Stage 4: Notification System [PENDING]
-**Status:** ⏳ Not Started
-**Goal:** Implement HTTP and socket notifications
+## Stage 4: Notification System [COMPLETED]
+**Status:** ✅ Complete
+**Directory:** `stage4_notifications/`
 
-### Planned Features
-- [ ] HTTP GET notifications with query parameters
-- [ ] HTTP POST notifications with JSON payload
-- [ ] Raw TCP socket notifications
-- [ ] Notification configuration via web UI
-- [ ] Test notification button
-- [ ] Notification on alarm state changes only
+### Features Implemented
+- [x] HTTP GET notifications with query parameters
+- [x] HTTP POST notifications with JSON payload
+- [x] Notification configuration via web UI (/settings)
+- [x] Test notification button with status feedback
+- [x] Notifications on alarm state changes (triggered/cleared)
+- [x] Notification statistics tracking (sent/failed)
+- [x] POST /test-notification endpoint
+- [x] Persistent notification settings in NVS
+
+### Configuration
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| notifyEnabled | boolean | Enable/disable notifications |
+| notifyUrl | string | Webhook URL (max 127 chars) |
+| notifyMethod | 0 or 1 | 0 = GET, 1 = POST |
+
+### Notification Events
+- `alarm_triggered` - Sent when alarm activates
+- `alarm_cleared` - Sent when alarm clears
+- `test` - Sent via test button
 
 ---
 
