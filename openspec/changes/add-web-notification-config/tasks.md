@@ -113,17 +113,39 @@ arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200
 
 ---
 
-## Stage 3: Persistent Configuration Storage [PENDING]
-**Status:** ⏳ Not Started
-**Goal:** Add NVS storage for WiFi credentials and settings
+## Stage 3: Persistent Configuration Storage [COMPLETED]
+**Status:** ✅ Complete
+**Directory:** `stage3_persistence/`
 
-### Planned Features
-- [ ] NVS/Preferences storage for configuration
-- [ ] Persistent WiFi credentials
-- [ ] Persistent trip delay and clear timeout settings
-- [ ] Web UI form for configuration changes
-- [ ] `/config` POST endpoint to save settings
-- [ ] Factory reset endpoint
+### Features Implemented
+- [x] NVS/Preferences storage for configuration
+- [x] Persistent WiFi credentials (SSID and password)
+- [x] Persistent trip delay and clear timeout settings
+- [x] Persistent filter threshold setting
+- [x] Web UI form for configuration changes (`/settings` page)
+- [x] `POST /config` endpoint to save settings
+- [x] `POST /reset` endpoint for factory reset
+- [x] Serial command 'f' for factory reset
+- [x] Checksum validation for stored config
+- [x] NVS self-test
+
+### Configuration
+| Parameter | Range | Default |
+|-----------|-------|---------|
+| WiFi SSID | 1-63 chars | From credentials.h |
+| WiFi Password | 1-63 chars | From credentials.h |
+| Trip Delay | 1-60 seconds | 3 |
+| Clear Timeout | 1-300 seconds | 10 |
+| Filter Threshold | 10-100% | 70 |
+
+### Web Interface
+- Dashboard at `/` with Settings link
+- Settings page at `/settings` with configuration form
+- REST API:
+  - `GET /status` - Current status as JSON
+  - `GET /config` - Current configuration as JSON
+  - `POST /config` - Save configuration to NVS
+  - `POST /reset` - Factory reset
 
 ---
 
@@ -141,15 +163,15 @@ arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200
 
 ---
 
-## Stage 5: Advanced Detection Parameters [PENDING]
-**Status:** ⏳ Not Started
-**Goal:** Add configurable timing parameters
+## Stage 5: Advanced Detection Parameters [MERGED INTO STAGE 3]
+**Status:** ✅ Merged
+**Note:** These features were implemented as part of Stage 3
 
-### Planned Features
-- [ ] Configurable trip delay via web UI
-- [ ] Configurable clear timeout via web UI
-- [ ] Debounce settings
-- [ ] Parameter validation
+### Features (Implemented in Stage 3)
+- [x] Configurable trip delay via web UI (1-60s)
+- [x] Configurable clear timeout via web UI (1-300s)
+- [x] Configurable filter threshold via web UI (10-100%)
+- [x] Parameter validation (enforced in POST /config handler)
 
 ---
 
