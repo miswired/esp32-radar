@@ -193,16 +193,22 @@ arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200
 
 ---
 
-## Stage 6: Full Diagnostics and System Integration [PENDING]
-**Status:** ⏳ Not Started
+## Stage 6: Full Diagnostics and System Integration [IN PROGRESS]
+**Status:** 🚧 In Progress
+**Directory:** `stage6_full_system/`
 **Goal:** Add comprehensive monitoring and logging
 
-### Planned Features
-- [ ] Event logging (circular buffer)
-- [ ] Watchdog timer
-- [ ] Comprehensive diagnostics dashboard
-- [ ] Memory leak monitoring
-- [ ] I2C/GPIO health monitoring
+### Features Implemented
+- [x] Event logging (50-entry circular buffer)
+- [x] Watchdog timer (30s hardware watchdog)
+- [x] Memory monitoring (heap history, min/max tracking)
+- [x] `/diagnostics` JSON endpoint
+- [x] `/logs` JSON endpoint
+- [x] Serial commands: `l` (logs), `d` (diagnostics)
+- [x] Event types: boot, wifi, alarm, notification, config, reset
+
+### Remaining Features
+- [ ] Web-based diagnostics dashboard page
 - [ ] 24-hour stability testing
 
 ---
