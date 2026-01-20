@@ -45,23 +45,25 @@ The system SHALL support two methods for transmitting API keys.
 - **THEN** the system SHALL use the header value for authentication
 
 ### Requirement: Protected Endpoints
-The system SHALL require authentication only for write operations (POST endpoints) when authentication is enabled. Read operations (GET endpoints) SHALL remain accessible to allow the web UI to function.
+The system SHALL require authentication only for external API access. Web UI operations SHALL NOT require API key authentication to allow local administration.
 
-#### Scenario: Protected endpoint list (write operations)
+#### Scenario: No endpoints require API key authentication
 - **WHEN** API authentication is enabled
-- **THEN** the following endpoints SHALL require authentication:
-  - `POST /config` (save configuration)
-  - `POST /test-notification` (send test notification)
-  - `POST /reset` (factory reset)
+- **THEN** no endpoints SHALL require API key authentication
+- **AND** the API key feature serves as an optional security layer for external integrations
+- **AND** the web UI SHALL function fully regardless of API key settings
 
-#### Scenario: Unprotected GET endpoints (read operations)
-- **WHEN** API authentication is enabled
-- **THEN** the following JSON endpoints SHALL remain accessible without authentication:
+#### Scenario: Unprotected endpoints
+- **WHEN** API authentication is enabled or disabled
+- **THEN** all endpoints SHALL remain accessible without API key authentication:
   - `GET /status` (sensor status)
   - `GET /config` (current configuration)
   - `GET /logs` (event log)
   - `GET /diagnostics` (system diagnostics)
-- **AND** this allows the web UI dashboard, settings, and diagnostics pages to function normally
+  - `POST /config` (save configuration)
+  - `POST /test-notification` (send test notification)
+  - `POST /reset` (factory reset)
+- **AND** this allows both the web UI and external tools to function
 
 #### Scenario: Unprotected HTML pages
 - **WHEN** API authentication is enabled
@@ -70,6 +72,11 @@ The system SHALL require authentication only for write operations (POST endpoint
   - `GET /settings` (Settings page)
   - `GET /diag` (Diagnostics page)
   - `GET /api` (API documentation)
+
+#### Scenario: Future web interface password protection
+- **GIVEN** the API key authentication does not protect web UI operations
+- **WHEN** web interface security is required
+- **THEN** a separate password protection mechanism SHOULD be implemented for web access
 
 ### Requirement: Authentication Failure Response
 The system SHALL return appropriate error responses for authentication failures.
