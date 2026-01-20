@@ -1967,146 +1967,41 @@ const char API_HTML[] PROGMEM = R"rawliteral(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>API - ESP32 Motion Sensor</title>
+  <title>API Documentation - ESP32 Motion Sensor</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #1a1a2e;
-      color: #eee;
-      min-height: 100vh;
-    }
-    nav {
-      background: #0f0f1a;
-      padding: 15px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid #16213e;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .nav-brand {
-      color: #00d4ff;
-      font-weight: bold;
-      font-size: 18px;
-      text-decoration: none;
-    }
-    .nav-links {
-      display: flex;
-      gap: 20px;
-    }
-    .nav-links a {
-      color: #888;
-      text-decoration: none;
-      font-size: 14px;
-      padding: 8px 16px;
-      border-radius: 6px;
-      transition: all 0.2s;
-    }
-    .nav-links a:hover {
-      color: #eee;
-      background: #16213e;
-    }
-    .nav-links a.active {
-      color: #00d4ff;
-      background: #16213e;
-    }
-    .container { max-width: 700px; margin: 0 auto; padding: 20px; }
-    .card {
-      background: #16213e;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    }
-    .card h2 {
-      font-size: 16px;
-      color: #00d4ff;
-      margin-bottom: 15px;
-    }
-    .card h3 {
-      font-size: 14px;
-      color: #888;
-      margin: 15px 0 10px 0;
-      text-transform: uppercase;
-    }
-    .endpoint {
-      background: #1a1a2e;
-      padding: 12px 15px;
-      border-radius: 8px;
-      margin-bottom: 10px;
-      font-family: monospace;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .method {
-      background: #00d4ff;
-      color: #1a1a2e;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-weight: bold;
-      font-size: 12px;
-    }
-    .method.post {
-      background: #4ade80;
-    }
-    .url {
-      color: #eee;
-    }
-    .url a {
-      color: #00d4ff;
-      text-decoration: none;
-    }
-    .url a:hover {
-      text-decoration: underline;
-    }
-    p {
-      color: #aaa;
-      font-size: 14px;
-      line-height: 1.6;
-      margin-bottom: 10px;
-    }
-    code {
-      background: #1a1a2e;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-family: monospace;
-      color: #00d4ff;
-    }
-    pre {
-      background: #1a1a2e;
-      padding: 15px;
-      border-radius: 8px;
-      overflow-x: auto;
-      font-size: 13px;
-      line-height: 1.5;
-      color: #aaa;
-    }
-    .field-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 10px 0;
-      font-size: 13px;
-    }
-    .field-table th {
-      text-align: left;
-      padding: 8px;
-      background: #1a1a2e;
-      color: #888;
-      font-weight: normal;
-    }
-    .field-table td {
-      padding: 8px;
-      border-top: 1px solid #1a1a2e;
-      color: #aaa;
-    }
-    .field-table td:first-child {
-      color: #00d4ff;
-      font-family: monospace;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; }
+    nav { background: #0f0f1a; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #16213e; position: sticky; top: 0; z-index: 100; }
+    .nav-brand { color: #00d4ff; font-weight: bold; font-size: 18px; text-decoration: none; }
+    .nav-links { display: flex; gap: 20px; }
+    .nav-links a { color: #888; text-decoration: none; font-size: 14px; padding: 8px 16px; border-radius: 6px; transition: all 0.2s; }
+    .nav-links a:hover { color: #eee; background: #16213e; }
+    .nav-links a.active { color: #00d4ff; background: #16213e; }
+    .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+    .tabs { display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; background: #0f0f1a; padding: 10px; border-radius: 12px; }
+    .tab { padding: 10px 16px; background: transparent; border: none; color: #888; cursor: pointer; border-radius: 8px; font-size: 13px; transition: all 0.2s; }
+    .tab:hover { color: #eee; background: #16213e; }
+    .tab.active { color: #00d4ff; background: #16213e; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .card { background: #16213e; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    .card h2 { font-size: 16px; color: #00d4ff; margin-bottom: 15px; }
+    .card h3 { font-size: 14px; color: #888; margin: 15px 0 10px 0; text-transform: uppercase; }
+    .endpoint { background: #1a1a2e; padding: 12px 15px; border-radius: 8px; margin-bottom: 10px; font-family: monospace; display: flex; align-items: center; gap: 10px; }
+    .method { background: #00d4ff; color: #1a1a2e; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+    .method.post { background: #4ade80; }
+    .auth-badge { background: #fbbf24; color: #1a1a2e; padding: 2px 8px; border-radius: 4px; font-size: 10px; margin-left: 10px; }
+    p { color: #aaa; font-size: 14px; line-height: 1.6; margin-bottom: 10px; }
+    code { background: #1a1a2e; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #00d4ff; }
+    pre { background: #1a1a2e; padding: 15px; border-radius: 8px; overflow-x: auto; font-size: 12px; line-height: 1.4; color: #aaa; }
+    .tbl { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12px; }
+    .tbl th { text-align: left; padding: 8px; background: #1a1a2e; color: #888; font-weight: normal; }
+    .tbl td { padding: 8px; border-top: 1px solid #1a1a2e; color: #aaa; }
+    .tbl td:first-child { color: #00d4ff; font-family: monospace; }
+    .warn { border-left: 4px solid #fbbf24; }
+    .info { border-left: 4px solid #00d4ff; }
+    .success { border-left: 4px solid #4ade80; }
+    .kbd { background: #333; padding: 3px 8px; border-radius: 4px; font-family: monospace; font-size: 12px; border: 1px solid #555; }
   </style>
 </head>
 <body>
@@ -2122,268 +2017,485 @@ const char API_HTML[] PROGMEM = R"rawliteral(
   </nav>
 
   <div class="container">
-    <div class="card">
-      <h2>REST API Endpoints</h2>
-      <p>The ESP32 Motion Sensor provides a REST API for integration with home automation systems, scripts, or custom applications.</p>
+    <div class="tabs">
+      <button class="tab active" data-tab="overview">Overview</button>
+      <button class="tab" data-tab="endpoints">API Endpoints</button>
+      <button class="tab" data-tab="wled">WLED Examples</button>
+      <button class="tab" data-tab="serial">Serial Console</button>
+      <button class="tab" data-tab="errors">Error Codes</button>
     </div>
 
-    <div class="card" style="border-left: 4px solid #fbbf24;">
-      <h2>Authentication</h2>
-      <p>API authentication is <strong>optional</strong> and disabled by default. When enabled, JSON API endpoints require a valid API key. HTML pages (Dashboard, Settings, Diagnostics, API docs) never require authentication.</p>
-
-      <h3>Protected Endpoints (when auth enabled)</h3>
-      <p style="margin-bottom: 15px;">GET /status, GET /config, POST /config, GET /logs, GET /diagnostics, POST /test-notification, POST /reset</p>
-
-      <h3>Authentication Methods</h3>
-      <p>You can provide your API key using either method:</p>
-
-      <p style="margin-top: 10px;"><strong>1. HTTP Header (Recommended)</strong></p>
-      <pre>curl -H "X-API-Key: your-api-key-here" http://192.168.1.100/status</pre>
-
-      <p style="margin-top: 10px;"><strong>2. Query Parameter</strong></p>
-      <pre>curl "http://192.168.1.100/status?apiKey=your-api-key-here"</pre>
-
-      <h3>Error Responses</h3>
-      <p style="margin-top: 10px;"><strong>401 Unauthorized</strong> - Missing or invalid API key</p>
-      <pre>{"error": "Authentication required", "code": 401}</pre>
-
-      <p style="margin-top: 10px;"><strong>429 Too Many Requests</strong> - Locked out after 5 failed attempts (5 min lockout)</p>
-      <pre>{"error": "Too many failed attempts", "code": 429, "retryAfter": 300}</pre>
-
-      <h3>Tips</h3>
-      <p>- Enable auth in Settings > API Authentication<br>
-         - Generate a new key anytime from the Settings page<br>
-         - Key is UUID format (e.g., a1b2c3d4-e5f6-4789-abcd-ef1234567890)<br>
-         - Store your key securely; it's shown once when generated</p>
-    </div>
-
-    <div class="card">
-      <h2>GET /status <span style="background:#fbbf24;color:#1a1a2e;padding:2px 8px;border-radius:4px;font-size:10px;margin-left:10px;">AUTH</span></h2>
-      <p>Returns current motion detection status and system metrics.</p>
-
-      <div class="endpoint">
-        <span class="method">GET</span>
-        <span class="url"><a href="/status" target="_blank">/status</a></span>
+    <!-- OVERVIEW TAB -->
+    <div id="overview" class="tab-content active">
+      <div class="card">
+        <h2>ESP32 Motion Sensor API</h2>
+        <p>REST API for integration with Home Assistant, scripts, and custom applications. All responses are JSON.</p>
       </div>
 
-      <h3>Response Fields</h3>
-      <table class="field-table">
-        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr><td>state</td><td>string</td><td>IDLE, MOTION_PENDING, ALARM_ACTIVE, ALARM_CLEARING</td></tr>
-        <tr><td>rawMotion</td><td>boolean</td><td>Raw sensor state (true = HIGH)</td></tr>
-        <tr><td>filteredMotion</td><td>boolean</td><td>Filtered motion (used by state machine)</td></tr>
-        <tr><td>filterPercent</td><td>integer</td><td>Current filter level (0-100%)</td></tr>
-        <tr><td>alarmEvents</td><td>integer</td><td>Total alarm triggers since boot</td></tr>
-        <tr><td>motionEvents</td><td>integer</td><td>Total motion detections since boot</td></tr>
-        <tr><td>uptime</td><td>integer</td><td>Seconds since boot</td></tr>
-        <tr><td>freeHeap</td><td>integer</td><td>Available memory (bytes)</td></tr>
-        <tr><td>tripDelay</td><td>integer</td><td>Trip delay setting (seconds)</td></tr>
-        <tr><td>clearTimeout</td><td>integer</td><td>Clear timeout setting (seconds)</td></tr>
-        <tr><td>filterThreshold</td><td>integer</td><td>Filter threshold (%)</td></tr>
-        <tr><td>wifiMode</td><td>string</td><td>Station or AP Mode</td></tr>
-        <tr><td>ipAddress</td><td>string</td><td>Current IP address</td></tr>
-        <tr><td>rssi</td><td>integer</td><td>WiFi signal strength (dBm)</td></tr>
-      </table>
-    </div>
-
-    <div class="card">
-      <h2>GET /config <span style="background:#fbbf24;color:#1a1a2e;padding:2px 8px;border-radius:4px;font-size:10px;margin-left:10px;">AUTH</span></h2>
-      <p>Returns current system configuration.</p>
-
-      <div class="endpoint">
-        <span class="method">GET</span>
-        <span class="url"><a href="/config" target="_blank">/config</a></span>
+      <div class="card">
+        <h2>Quick Reference</h2>
+        <table class="tbl">
+          <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Description</th></tr>
+          <tr><td>GET</td><td>/status</td><td>-</td><td>Current motion state and metrics</td></tr>
+          <tr><td>GET</td><td>/config</td><td>-</td><td>System configuration</td></tr>
+          <tr><td>POST</td><td>/config</td><td>Yes</td><td>Update configuration</td></tr>
+          <tr><td>POST</td><td>/reset</td><td>Yes</td><td>Factory reset device</td></tr>
+          <tr><td>POST</td><td>/test-notification</td><td>Yes</td><td>Test notification webhook</td></tr>
+          <tr><td>POST</td><td>/test-wled</td><td>Yes</td><td>Test WLED integration</td></tr>
+          <tr><td>GET</td><td>/logs</td><td>-</td><td>Event log (last 50)</td></tr>
+          <tr><td>GET</td><td>/diagnostics</td><td>-</td><td>System health data</td></tr>
+          <tr><td>POST</td><td>/generate-key</td><td>-</td><td>Generate new API key</td></tr>
+          <tr><td>GET</td><td>/auth/status</td><td>-</td><td>Check login status</td></tr>
+          <tr><td>POST</td><td>/auth/setup</td><td>-</td><td>Create password</td></tr>
+          <tr><td>POST</td><td>/auth/login</td><td>-</td><td>Login with password</td></tr>
+          <tr><td>POST</td><td>/auth/logout</td><td>-</td><td>End session</td></tr>
+        </table>
       </div>
 
-      <h3>Response Fields</h3>
-      <table class="field-table">
-        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr><td>sensorPin</td><td>integer</td><td>GPIO pin for sensor</td></tr>
-        <tr><td>ledPin</td><td>integer</td><td>GPIO pin for LED</td></tr>
-        <tr><td>tripDelaySeconds</td><td>integer</td><td>Trip delay (seconds)</td></tr>
-        <tr><td>clearTimeoutSeconds</td><td>integer</td><td>Clear timeout (seconds)</td></tr>
-        <tr><td>filterThresholdPercent</td><td>integer</td><td>Filter threshold (%)</td></tr>
-        <tr><td>wifiSsid</td><td>string</td><td>Connected WiFi network</td></tr>
-        <tr><td>wifiMode</td><td>string</td><td>Station or AP Mode</td></tr>
-        <tr><td>ipAddress</td><td>string</td><td>Current IP address</td></tr>
-        <tr><td>authEnabled</td><td>boolean</td><td>API auth enabled</td></tr>
-        <tr><td>authConfigured</td><td>boolean</td><td>API key exists</td></tr>
-      </table>
+      <div class="card warn">
+        <h2>Authentication</h2>
+        <p><strong>Web Password:</strong> Protects Settings page in browser. Sessions last 1 hour.</p>
+        <p><strong>API Key:</strong> Optional protection for POST endpoints. Disabled by default.</p>
+        <p style="margin-top:10px"><strong>POST endpoints accept EITHER session cookie OR API key.</strong></p>
+        <h3>Using API Key</h3>
+        <pre>curl -H "X-API-Key: your-key-here" -X POST http://192.168.1.100/reset
+
+# Or via query parameter:
+curl -X POST "http://192.168.1.100/reset?apiKey=your-key-here"</pre>
+      </div>
     </div>
 
-    <div class="card">
-      <h2>POST /config <span style="background:#fbbf24;color:#1a1a2e;padding:2px 8px;border-radius:4px;font-size:10px;margin-left:10px;">AUTH</span></h2>
-      <p>Save configuration settings. Send JSON body with fields to update.</p>
-
-      <div class="endpoint">
-        <span class="method post">POST</span>
-        <span class="url">/config</span>
+    <!-- ENDPOINTS TAB -->
+    <div id="endpoints" class="tab-content">
+      <div class="card">
+        <h2>GET /status</h2>
+        <p>Current motion detection state and system metrics.</p>
+        <div class="endpoint"><span class="method">GET</span> /status</div>
+        <h3>Example Response</h3>
+        <pre>{
+  "state": "IDLE",
+  "rawMotion": false,
+  "filteredMotion": false,
+  "filterPercent": 0,
+  "alarmEvents": 5,
+  "motionEvents": 42,
+  "uptime": 3600,
+  "freeHeap": 245000,
+  "tripDelay": 3,
+  "clearTimeout": 10,
+  "filterThreshold": 70,
+  "wifiMode": "Station",
+  "ipAddress": "192.168.1.100",
+  "rssi": -45
+}</pre>
       </div>
 
-      <h3>Request Fields (all optional)</h3>
-      <table class="field-table">
-        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr><td>wifiSsid</td><td>string</td><td>New WiFi SSID (triggers restart)</td></tr>
-        <tr><td>wifiPassword</td><td>string</td><td>New WiFi password (triggers restart)</td></tr>
-        <tr><td>tripDelay</td><td>integer</td><td>Trip delay 1-60 seconds</td></tr>
-        <tr><td>clearTimeout</td><td>integer</td><td>Clear timeout 1-300 seconds</td></tr>
-        <tr><td>filterThreshold</td><td>integer</td><td>Filter threshold 10-100%</td></tr>
-        <tr><td>authEnabled</td><td>boolean</td><td>Enable/disable API auth</td></tr>
-        <tr><td>apiKey</td><td>string</td><td>New API key (36 char UUID)</td></tr>
-      </table>
+      <div class="card">
+        <h2>GET /config</h2>
+        <p>Current system configuration values.</p>
+        <div class="endpoint"><span class="method">GET</span> /config</div>
+        <h3>Example Response</h3>
+        <pre>{
+  "sensorPin": 13,
+  "ledPin": 2,
+  "tripDelaySeconds": 3,
+  "clearTimeoutSeconds": 10,
+  "filterThresholdPercent": 70,
+  "wifiSsid": "MyNetwork",
+  "wifiMode": "Station",
+  "ipAddress": "192.168.1.100",
+  "notifyEnabled": true,
+  "notifyUrl": "http://homeassistant:8123/api/webhook/motion",
+  "notifyGet": false,
+  "notifyPost": true,
+  "wledEnabled": true,
+  "wledUrl": "http://192.168.1.50/json/state",
+  "wledPayload": "{\"on\":true,\"bri\":255,\"seg\":[{\"col\":[[255,0,0]]}]}",
+  "authEnabled": true,
+  "authConfigured": true
+}</pre>
+      </div>
 
-      <h3>Example (without auth)</h3>
-      <pre>curl -X POST http://192.168.1.100/config \
+      <div class="card">
+        <h2>POST /config <span class="auth-badge">AUTH</span></h2>
+        <p>Update configuration. All fields optional. WiFi changes trigger restart.</p>
+        <div class="endpoint"><span class="method post">POST</span> /config</div>
+        <h3>Request Fields</h3>
+        <table class="tbl">
+          <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+          <tr><td>wifiSsid</td><td>string</td><td>WiFi network (restarts device)</td></tr>
+          <tr><td>wifiPassword</td><td>string</td><td>WiFi password (restarts device)</td></tr>
+          <tr><td>tripDelay</td><td>int</td><td>1-60 seconds</td></tr>
+          <tr><td>clearTimeout</td><td>int</td><td>1-300 seconds</td></tr>
+          <tr><td>filterThreshold</td><td>int</td><td>10-100 percent</td></tr>
+          <tr><td>notifyEnabled</td><td>bool</td><td>Enable notifications</td></tr>
+          <tr><td>notifyUrl</td><td>string</td><td>Webhook URL (max 127)</td></tr>
+          <tr><td>notifyGet</td><td>bool</td><td>Send GET requests</td></tr>
+          <tr><td>notifyPost</td><td>bool</td><td>Send POST requests</td></tr>
+          <tr><td>wledEnabled</td><td>bool</td><td>Enable WLED</td></tr>
+          <tr><td>wledUrl</td><td>string</td><td>WLED URL (max 128)</td></tr>
+          <tr><td>wledPayload</td><td>string</td><td>JSON payload (max 512)</td></tr>
+          <tr><td>authEnabled</td><td>bool</td><td>Enable API auth</td></tr>
+          <tr><td>apiKey</td><td>string</td><td>36-char UUID</td></tr>
+        </table>
+        <h3>Example</h3>
+        <pre>curl -X POST http://192.168.1.100/config \
   -H "Content-Type: application/json" \
-  -d '{"tripDelay": 5, "filterThreshold": 80}'</pre>
-
-      <h3>Example (with auth)</h3>
-      <pre>curl -X POST http://192.168.1.100/config \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key-here" \
-  -d '{"tripDelay": 5, "filterThreshold": 80}'</pre>
-    </div>
-
-    <div class="card">
-      <h2>POST /reset <span style="background:#fbbf24;color:#1a1a2e;padding:2px 8px;border-radius:4px;font-size:10px;margin-left:10px;">AUTH</span></h2>
-      <p>Factory reset - clears all saved settings and restarts device.</p>
-
-      <div class="endpoint">
-        <span class="method post">POST</span>
-        <span class="url">/reset</span>
+  -H "X-API-Key: your-key" \
+  -d '{"tripDelay": 5, "wledEnabled": true}'</pre>
+        <h3>Response</h3>
+        <pre>{"success": true, "message": "Settings saved.", "restart": false}</pre>
       </div>
 
-      <h3>Example</h3>
-      <pre>curl -X POST http://192.168.1.100/reset</pre>
-    </div>
-
-    <div class="card">
-      <h2>POST /test-notification <span style="background:#fbbf24;color:#1a1a2e;padding:2px 8px;border-radius:4px;font-size:10px;margin-left:10px;">AUTH</span></h2>
-      <p>Send a test notification. Optionally provide URL and method in request body.</p>
-
-      <div class="endpoint">
-        <span class="method post">POST</span>
-        <span class="url">/test-notification</span>
+      <div class="card">
+        <h2>POST /test-notification <span class="auth-badge">AUTH</span></h2>
+        <p>Test notification with form values or saved config.</p>
+        <div class="endpoint"><span class="method post">POST</span> /test-notification</div>
+        <h3>Request</h3>
+        <pre>{"url": "http://example.com/hook", "notifyGet": true, "notifyPost": true}</pre>
+        <h3>Response</h3>
+        <pre>{"success": true, "httpCode": 200, "message": "GET: 200, POST: 200"}</pre>
       </div>
 
-      <h3>Request Fields (optional)</h3>
-      <table class="field-table">
-        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr><td>url</td><td>string</td><td>URL to test (uses saved URL if omitted)</td></tr>
-        <tr><td>method</td><td>integer</td><td>0 = GET, 1 = POST</td></tr>
-      </table>
-
-      <h3>Example</h3>
-      <pre>curl -X POST http://192.168.1.100/test-notification \
-  -H "Content-Type: application/json" \
-  -d '{"url": "http://example.com/webhook", "method": 1}'</pre>
-    </div>
-
-    <div class="card">
-      <h2>GET /logs <span style="background:#fbbf24;color:#1a1a2e;padding:2px 8px;border-radius:4px;font-size:10px;margin-left:10px;">AUTH</span></h2>
-      <p>Returns the event log (last 50 system events).</p>
-
-      <div class="endpoint">
-        <span class="method">GET</span>
-        <span class="url"><a href="/logs" target="_blank">/logs</a></span>
+      <div class="card">
+        <h2>POST /test-wled <span class="auth-badge">AUTH</span></h2>
+        <p>Test WLED integration with form values or saved config.</p>
+        <div class="endpoint"><span class="method post">POST</span> /test-wled</div>
+        <h3>Request</h3>
+        <pre>{"url": "http://192.168.1.50/json/state", "payload": "{\"on\":true}"}</pre>
+        <h3>Response</h3>
+        <pre>{"success": true, "httpCode": 200, "message": "WLED payload sent successfully"}</pre>
       </div>
 
-      <h3>Response Fields</h3>
-      <table class="field-table">
-        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr><td>events</td><td>array</td><td>Array of event objects</td></tr>
-        <tr><td>events[].time</td><td>integer</td><td>Timestamp (millis since boot)</td></tr>
-        <tr><td>events[].uptime</td><td>string</td><td>Formatted uptime (HH:MM:SS)</td></tr>
-        <tr><td>events[].event</td><td>string</td><td>Event type name</td></tr>
-        <tr><td>events[].data</td><td>integer</td><td>Optional event data</td></tr>
-        <tr><td>count</td><td>integer</td><td>Number of events in log</td></tr>
-        <tr><td>maxSize</td><td>integer</td><td>Maximum log capacity (50)</td></tr>
-      </table>
-
-      <h3>Event Types</h3>
-      <table class="field-table">
-        <tr><th>Event</th><th>Data</th><th>Description</th></tr>
-        <tr><td>BOOT</td><td>heap size</td><td>System boot</td></tr>
-        <tr><td>WIFI_CONNECTED</td><td>RSSI</td><td>WiFi connected</td></tr>
-        <tr><td>WIFI_AP_MODE</td><td>-</td><td>Fallback to AP mode</td></tr>
-        <tr><td>ALARM_TRIGGERED</td><td>count</td><td>Alarm activated</td></tr>
-        <tr><td>ALARM_CLEARED</td><td>duration</td><td>Alarm cleared</td></tr>
-        <tr><td>NOTIFY_SENT</td><td>HTTP code</td><td>Notification sent</td></tr>
-        <tr><td>NOTIFY_FAILED</td><td>error code</td><td>Notification failed</td></tr>
-        <tr><td>CONFIG_SAVED</td><td>-</td><td>Config saved to NVS</td></tr>
-        <tr><td>FACTORY_RESET</td><td>-</td><td>Factory reset initiated</td></tr>
-        <tr><td>HEAP_LOW</td><td>heap size</td><td>Low memory warning</td></tr>
-        <tr><td>AUTH_FAILED</td><td>attempt #</td><td>API authentication failed</td></tr>
-        <tr><td>AUTH_LOCKOUT</td><td>duration</td><td>Rate limit lockout activated</td></tr>
-      </table>
-    </div>
-
-    <div class="card">
-      <h2>GET /diagnostics <span style="background:#fbbf24;color:#1a1a2e;padding:2px 8px;border-radius:4px;font-size:10px;margin-left:10px;">AUTH</span></h2>
-      <p>Returns comprehensive system diagnostics and health information.</p>
-
-      <div class="endpoint">
-        <span class="method">GET</span>
-        <span class="url"><a href="/diagnostics" target="_blank">/diagnostics</a></span>
+      <div class="card">
+        <h2>POST /reset <span class="auth-badge">AUTH</span></h2>
+        <p>Factory reset - clears all settings and restarts.</p>
+        <div class="endpoint"><span class="method post">POST</span> /reset</div>
+        <pre>curl -X POST http://192.168.1.100/reset -H "X-API-Key: your-key"</pre>
       </div>
 
-      <h3>Response Fields</h3>
-      <table class="field-table">
-        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-        <tr><td>uptime</td><td>integer</td><td>Milliseconds since boot</td></tr>
-        <tr><td>uptimeFormatted</td><td>string</td><td>Formatted uptime</td></tr>
-        <tr><td>freeHeap</td><td>integer</td><td>Current free heap (bytes)</td></tr>
-        <tr><td>minHeap</td><td>integer</td><td>Minimum heap seen</td></tr>
-        <tr><td>maxHeap</td><td>integer</td><td>Maximum heap seen</td></tr>
-        <tr><td>heapFragmentation</td><td>integer</td><td>Fragmentation percentage</td></tr>
-        <tr><td>watchdogEnabled</td><td>boolean</td><td>Watchdog timer status</td></tr>
-        <tr><td>watchdogTimeout</td><td>integer</td><td>Watchdog timeout (seconds)</td></tr>
-        <tr><td>heapHistory</td><td>array</td><td>Recent heap samples (1/min)</td></tr>
-        <tr><td>recentEvents</td><td>array</td><td>Last 10 events</td></tr>
-        <tr><td>authEnabled</td><td>boolean</td><td>API auth enabled</td></tr>
-        <tr><td>authFailedAttempts</td><td>integer</td><td>Current fail count</td></tr>
-        <tr><td>authLockoutRemaining</td><td>integer</td><td>Lockout seconds left (if active)</td></tr>
-      </table>
-    </div>
-
-    <div class="card">
-      <h2>POST /generate-key</h2>
-      <p>Generate a new random API key (does not save it). Used by Settings page for preview.</p>
-
-      <div class="endpoint">
-        <span class="method post">POST</span>
-        <span class="url">/generate-key</span>
+      <div class="card">
+        <h2>GET /logs</h2>
+        <p>Event log with last 50 system events.</p>
+        <div class="endpoint"><span class="method">GET</span> /logs</div>
+        <h3>Example Response</h3>
+        <pre>{
+  "events": [
+    {"time": 1000, "uptime": "00:00:01", "event": "BOOT", "data": 285000},
+    {"time": 5000, "uptime": "00:00:05", "event": "WIFI_CONNECTED", "data": -45},
+    {"time": 60000, "uptime": "00:01:00", "event": "ALARM_TRIGGERED", "data": 1}
+  ],
+  "count": 3,
+  "maxSize": 50
+}</pre>
       </div>
 
-      <h3>Response</h3>
-      <pre>{"key": "a1b2c3d4-e5f6-4789-abcd-ef1234567890"}</pre>
+      <div class="card">
+        <h2>GET /diagnostics</h2>
+        <p>System health and performance data.</p>
+        <div class="endpoint"><span class="method">GET</span> /diagnostics</div>
+        <h3>Example Response</h3>
+        <pre>{
+  "uptime": 3600000,
+  "uptimeFormatted": "01:00:00",
+  "freeHeap": 245000,
+  "minHeap": 230000,
+  "maxHeap": 285000,
+  "heapFragmentation": 5,
+  "watchdogEnabled": true,
+  "watchdogTimeout": 30,
+  "authEnabled": true,
+  "authFailedAttempts": 0,
+  "authLockoutRemaining": 0
+}</pre>
+      </div>
 
-      <p style="margin-top: 10px;">Note: This endpoint does not require authentication. The generated key must be saved via POST /config to take effect.</p>
+      <div class="card success">
+        <h2>Web Auth Endpoints</h2>
+        <p>Browser authentication for Settings page.</p>
+        <h3>GET /auth/status</h3>
+        <pre>{"passwordConfigured": true, "loggedIn": false}</pre>
+        <h3>POST /auth/setup</h3>
+        <pre>Request:  {"password": "mypass", "confirmPassword": "mypass"}
+Response: {"success": true, "message": "Password created"}</pre>
+        <h3>POST /auth/login</h3>
+        <pre>Request:  {"password": "mypass"}
+Response: {"success": true, "message": "Login successful"}</pre>
+        <h3>POST /auth/logout</h3>
+        <pre>{"success": true, "message": "Logged out"}</pre>
+      </div>
+    </div>
+
+    <!-- WLED TAB -->
+    <div id="wled" class="tab-content">
+      <div class="card info">
+        <h2>WLED Integration</h2>
+        <p>Send JSON payloads to WLED devices when alarms trigger. WLED is open-source firmware for ESP8266/ESP32-based LED controllers.</p>
+        <p><strong>URL Format:</strong> <code>http://WLED_IP/json/state</code></p>
+        <p><strong>Max Payload:</strong> 512 characters</p>
+        <p><strong>Timeout:</strong> 3 seconds</p>
+      </div>
+
+      <div class="card">
+        <h2>Solid Red (Default)</h2>
+        <p>Full brightness solid red - good for alarm indication.</p>
+        <pre>{"on":true,"bri":255,"seg":[{"col":[[255,0,0]]}]}</pre>
+      </div>
+
+      <div class="card">
+        <h2>Solid Blue</h2>
+        <p>Full brightness solid blue.</p>
+        <pre>{"on":true,"bri":255,"seg":[{"col":[[0,0,255]]}]}</pre>
+      </div>
+
+      <div class="card">
+        <h2>Orange Warning</h2>
+        <p>Medium brightness orange - subtle warning.</p>
+        <pre>{"on":true,"bri":150,"seg":[{"col":[[255,165,0]]}]}</pre>
+      </div>
+
+      <div class="card">
+        <h2>Strobe/Flash Effect</h2>
+        <p>Red strobe effect (effect ID 25).</p>
+        <pre>{"on":true,"bri":255,"seg":[{"fx":25,"col":[[255,0,0]]}]}</pre>
+      </div>
+
+      <div class="card">
+        <h2>Police Lights</h2>
+        <p>Red/blue alternating (effect ID 1 = Blink).</p>
+        <pre>{"on":true,"bri":255,"seg":[{"fx":1,"sx":200,"col":[[255,0,0],[0,0,255]]}]}</pre>
+      </div>
+
+      <div class="card">
+        <h2>Fire Effect</h2>
+        <p>Fire simulation (effect ID 66).</p>
+        <pre>{"on":true,"bri":255,"seg":[{"fx":66,"sx":128,"ix":200}]}</pre>
+      </div>
+
+      <div class="card">
+        <h2>Rainbow Chase</h2>
+        <p>Rainbow pattern moving (effect ID 9).</p>
+        <pre>{"on":true,"bri":200,"seg":[{"fx":9,"sx":150}]}</pre>
+      </div>
+
+      <div class="card">
+        <h2>Turn Off LEDs</h2>
+        <p>Turn off the strip (for resetting after alarm).</p>
+        <pre>{"on":false}</pre>
+      </div>
+
+      <div class="card warn">
+        <h2>Common WLED Fields</h2>
+        <table class="tbl">
+          <tr><th>Field</th><th>Range</th><th>Description</th></tr>
+          <tr><td>on</td><td>true/false</td><td>Master on/off</td></tr>
+          <tr><td>bri</td><td>0-255</td><td>Brightness</td></tr>
+          <tr><td>seg[].col</td><td>[[R,G,B]]</td><td>Primary color</td></tr>
+          <tr><td>seg[].fx</td><td>0-117</td><td>Effect ID</td></tr>
+          <tr><td>seg[].sx</td><td>0-255</td><td>Effect speed</td></tr>
+          <tr><td>seg[].ix</td><td>0-255</td><td>Effect intensity</td></tr>
+        </table>
+        <p style="margin-top:10px">Full reference: <a href="https://kno.wled.ge/interfaces/json-api/" target="_blank" style="color:#00d4ff">kno.wled.ge/interfaces/json-api</a></p>
+      </div>
+    </div>
+
+    <!-- SERIAL TAB -->
+    <div id="serial" class="tab-content">
+      <div class="card info">
+        <h2>Serial Console Connection</h2>
+        <p>The ESP32 provides a serial console for debugging, diagnostics, and recovery options.</p>
+      </div>
+
+      <div class="card">
+        <h2>Hardware Connection</h2>
+        <p><strong>1.</strong> Connect ESP32 to computer via USB cable (micro-USB or USB-C depending on board).</p>
+        <p><strong>2.</strong> The ESP32 will appear as a serial port:</p>
+        <table class="tbl">
+          <tr><th>OS</th><th>Port Name</th></tr>
+          <tr><td>Windows</td><td>COM3, COM4, etc. (check Device Manager)</td></tr>
+          <tr><td>Linux</td><td>/dev/ttyUSB0 or /dev/ttyACM0</td></tr>
+          <tr><td>macOS</td><td>/dev/cu.usbserial-* or /dev/cu.SLAB_USBtoUART</td></tr>
+        </table>
+        <p style="margin-top:10px"><strong>Baud Rate:</strong> <code>115200</code></p>
+        <p><strong>Data Bits:</strong> 8 | <strong>Parity:</strong> None | <strong>Stop Bits:</strong> 1</p>
+      </div>
+
+      <div class="card">
+        <h2>Using PuTTY (Windows)</h2>
+        <p><strong>1.</strong> Download PuTTY from <a href="https://putty.org" target="_blank" style="color:#00d4ff">putty.org</a></p>
+        <p><strong>2.</strong> Open PuTTY and select "Serial" connection type</p>
+        <p><strong>3.</strong> Enter the COM port (e.g., COM3)</p>
+        <p><strong>4.</strong> Set Speed to <code>115200</code></p>
+        <p><strong>5.</strong> Click "Open" to connect</p>
+      </div>
+
+      <div class="card">
+        <h2>Using Arduino CLI</h2>
+        <pre># List available ports
+arduino-cli board list
+
+# Connect to serial monitor
+arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200
+
+# On Windows:
+arduino-cli monitor -p COM3 -c baudrate=115200</pre>
+      </div>
+
+      <div class="card">
+        <h2>Using screen (Linux/macOS)</h2>
+        <pre># Connect
+screen /dev/ttyUSB0 115200
+
+# Disconnect: Press Ctrl+A then K, confirm with Y</pre>
+      </div>
+
+      <div class="card warn">
+        <h2>Serial Commands</h2>
+        <p>Press these keys in the serial console:</p>
+        <table class="tbl">
+          <tr><th>Key</th><th>Action</th></tr>
+          <tr><td class="kbd">h</td><td>Show help / available commands</td></tr>
+          <tr><td class="kbd">s</td><td>Show current status</td></tr>
+          <tr><td class="kbd">d</td><td>Show diagnostics (heap, uptime, WiFi)</td></tr>
+          <tr><td class="kbd">c</td><td>Show current configuration</td></tr>
+          <tr><td class="kbd">e</td><td>Show recent events</td></tr>
+          <tr><td class="kbd">w</td><td>Show WiFi info</td></tr>
+          <tr><td class="kbd">a</td><td>Show API auth status, then:
+            <br>&nbsp;&nbsp;<span class="kbd">a</span> again = generate new key
+            <br>&nbsp;&nbsp;<span class="kbd">A</span> = toggle auth on/off</td></tr>
+          <tr><td class="kbd">p</td><td>Clear web password (recovery)</td></tr>
+          <tr><td class="kbd">f</td><td>Factory reset (clears all settings)</td></tr>
+          <tr><td class="kbd">r</td><td>Reboot device</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Password Recovery</h2>
+        <p>If locked out of the web interface:</p>
+        <p><strong>1.</strong> Connect to serial console</p>
+        <p><strong>2.</strong> Press <span class="kbd">p</span> to clear the password</p>
+        <p><strong>3.</strong> Visit Settings page - you'll be prompted to create a new password</p>
+      </div>
+
+      <div class="card">
+        <h2>Boot Output Example</h2>
+        <pre>==========================================
+ESP32 Microwave Motion Sensor - Stage 8
+==========================================
+WLED Integration
+
+Reset reason: POWERON_RESET
+GPIO initialized
+Loading configuration from NVS... OK
+
+Connecting to WiFi: MyNetwork.....
+Connected! IP: 192.168.1.100
+RSSI: -45 dBm
+
+Web server started on port 80
+------------------------------------------
+Dashboard:    http://192.168.1.100
+Settings:     http://192.168.1.100/settings
+Diagnostics:  http://192.168.1.100/diag
+------------------------------------------</pre>
+      </div>
+    </div>
+
+    <!-- ERRORS TAB -->
+    <div id="errors" class="tab-content">
+      <div class="card">
+        <h2>HTTP Status Codes</h2>
+        <table class="tbl">
+          <tr><th>Code</th><th>Meaning</th></tr>
+          <tr><td>200</td><td>Success</td></tr>
+          <tr><td>400</td><td>Bad Request (invalid parameters)</td></tr>
+          <tr><td>401</td><td>Unauthorized (auth required)</td></tr>
+          <tr><td>429</td><td>Too Many Requests (rate limited)</td></tr>
+          <tr><td>500</td><td>Internal Server Error</td></tr>
+        </table>
+      </div>
+
+      <div class="card warn">
+        <h2>Authentication Errors</h2>
+        <h3>401 - Missing or Invalid API Key</h3>
+        <pre>{"error": "Authentication required", "code": 401}</pre>
+        <p>Provide valid API key via X-API-Key header or apiKey query param.</p>
+
+        <h3>429 - Rate Limited</h3>
+        <pre>{"error": "Too many failed attempts", "code": 429, "retryAfter": 300}</pre>
+        <p>5 failed attempts = 5 minute lockout. Wait or use serial console to reset.</p>
+      </div>
+
+      <div class="card">
+        <h2>Configuration Errors</h2>
+        <h3>Invalid WLED Payload</h3>
+        <pre>{"success": false, "message": "Invalid WLED JSON payload"}</pre>
+        <p>The wledPayload must be valid JSON. Check syntax with a JSON validator.</p>
+
+        <h3>Password Mismatch</h3>
+        <pre>{"success": false, "message": "Passwords do not match"}</pre>
+        <p>password and confirmPassword fields must be identical.</p>
+
+        <h3>Password Too Short</h3>
+        <pre>{"success": false, "message": "Password must be at least 6 characters"}</pre>
+      </div>
+
+      <div class="card">
+        <h2>Notification/WLED Errors</h2>
+        <h3>Not Connected to WiFi</h3>
+        <pre>{"success": false, "message": "Not connected to WiFi"}</pre>
+        <p>Device must be in Station mode (connected to router) to send HTTP requests.</p>
+
+        <h3>No URL Configured</h3>
+        <pre>{"success": false, "message": "No notification URL provided"}</pre>
+
+        <h3>Connection Failed</h3>
+        <pre>{"success": false, "httpCode": -1, "message": "Connection failed"}</pre>
+        <p>Could not reach target server. Check URL, network, and firewall.</p>
+
+        <h3>Timeout</h3>
+        <pre>{"success": false, "httpCode": -11, "message": "Connection failed"}</pre>
+        <p>Request timed out. WLED has 3-second timeout, notifications have 5-second.</p>
+      </div>
+
+      <div class="card">
+        <h2>Common HTTP Error Codes from WLED</h2>
+        <table class="tbl">
+          <tr><th>Code</th><th>Meaning</th><th>Fix</th></tr>
+          <tr><td>-1</td><td>Connection refused</td><td>Check WLED is on and IP is correct</td></tr>
+          <tr><td>404</td><td>Not Found</td><td>URL should end with /json/state</td></tr>
+          <tr><td>400</td><td>Bad Request</td><td>Invalid JSON payload syntax</td></tr>
+          <tr><td>500</td><td>WLED Error</td><td>Check WLED device logs</td></tr>
+        </table>
+      </div>
     </div>
   </div>
 
   <script>
-    // Auth button handling
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab).classList.add('active');
+      };
+    });
+
+    // Auth button
     const handleLogout = () => {
-      fetch('/auth/logout', { method: 'POST' })
-        .then(() => { checkAuthStatus(); })
-        .catch(err => console.log('Logout failed'));
+      fetch('/auth/logout', { method: 'POST' }).then(() => checkAuthStatus());
     };
-
     const checkAuthStatus = () => {
-      fetch('/auth/status')
-        .then(response => response.json())
-        .then(data => {
-          const btn = document.getElementById('authBtn');
-          if (data.passwordConfigured) {
-            btn.style.display = 'block';
-            btn.textContent = data.loggedIn ? 'Logout' : 'Login';
-            btn.onclick = data.loggedIn ? handleLogout : () => { window.location.href = '/settings'; };
-          }
-        })
-        .catch(err => console.log('Auth check failed'));
+      fetch('/auth/status').then(r => r.json()).then(data => {
+        const btn = document.getElementById('authBtn');
+        if (data.passwordConfigured) {
+          btn.style.display = 'block';
+          btn.textContent = data.loggedIn ? 'Logout' : 'Login';
+          btn.onclick = data.loggedIn ? handleLogout : () => { window.location.href = '/settings'; };
+        }
+      }).catch(() => {});
     };
-
     checkAuthStatus();
   </script>
 </body>
