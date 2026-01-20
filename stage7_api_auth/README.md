@@ -1,16 +1,28 @@
-# Stage 7: API Key Authentication
+# Stage 7: API Key Authentication & Web Password Protection
 
-This stage builds on Stage 6 and adds optional API key authentication for securing JSON endpoints.
+This stage builds on Stage 6 and adds comprehensive authentication for both API access and web interface protection.
 
 ## New Features in Stage 7
 
-- **API Key Authentication**: Optional authentication for all JSON API endpoints
+### API Key Authentication
+- **API Key Authentication**: Optional authentication for POST API endpoints
 - **UUID v4 Keys**: Cryptographically secure keys generated using ESP32 hardware RNG
 - **Dual Auth Methods**: Support for both HTTP header (`X-API-Key`) and query parameter (`?apiKey=`)
 - **Rate Limiting**: Lockout after 5 failed attempts (5-minute cooldown)
 - **Security Logging**: Authentication failures logged to event system
-- **Web UI Management**: Generate, view, and manage keys from Settings page
-- **Serial Commands**: New 'a' command for auth management
+
+### Web Password Protection
+- **Password-Protected Settings**: Settings page requires login when password is configured
+- **SHA-256 Password Hashing**: Secure password storage using mbedtls
+- **Session-Based Auth**: Cookie-based sessions with 1-hour timeout
+- **First-Time Setup Modal**: Prompts for password creation on first visit
+- **Login/Logout UI**: Auth button in nav bar on all pages
+- **Serial Password Reset**: Press 'p' to clear password via serial console
+
+### Dual Authentication Model
+- **Web Password**: For browser-based access to Settings page
+- **API Key**: For programmatic POST requests (external integrations)
+- POST endpoints accept either valid session cookie OR valid API key
 
 ## Prerequisites
 
@@ -33,28 +45,43 @@ Same as previous stages:
 
 Authentication is **disabled by default** for backwards compatibility. The API key feature is intended for securing external integrations (scripts, Home Assistant, etc.) and does not restrict web UI access. The local web interface always functions fully, allowing administrators to manage settings without needing an API key.
 
-### API Key Authentication Model
+### Dual Authentication Model
 
-The API key feature is designed for **external integrations** (curl, scripts, Home Assistant, etc.). The local web UI does not require API key authentication to function, allowing administrators to always access and modify settings through the browser.
+Stage 7 implements two independent authentication mechanisms:
 
-**All endpoints are accessible without API key:**
+1. **Web Password** - Protects browser access to the Settings page
+   - First-time visitors are prompted to create a password
+   - Returning visitors must login to access Settings
+   - Session cookie valid for 1 hour
+   - Single active session at a time
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/status` | Sensor status (JSON) |
-| GET | `/config` | Configuration (JSON) |
-| GET | `/logs` | Event log (JSON) |
-| GET | `/diagnostics` | System diagnostics (JSON) |
-| POST | `/config` | Save configuration |
-| POST | `/test-notification` | Test notification |
-| POST | `/reset` | Factory reset |
-| GET | `/` | Dashboard page |
-| GET | `/settings` | Settings page |
-| GET | `/diag` | Diagnostics page |
-| GET | `/api` | API documentation |
-| POST | `/generate-key` | Generate new key (preview) |
+2. **API Key** - Protects POST endpoints for external integrations
+   - Optional (disabled by default for backwards compatibility)
+   - Required for: `/config`, `/reset`, `/test-notification` when enabled
+   - Supports header (`X-API-Key`) or query param (`?apiKey=`)
 
-**Note:** A separate password protection mechanism for web access is planned for a future release.
+**POST endpoints accept EITHER valid session cookie OR valid API key** when auth is enabled.
+
+### Endpoint Authentication Matrix
+
+| Method | Endpoint | Web Password | API Key (when enabled) |
+|--------|----------|--------------|------------------------|
+| GET | `/status` | Not required | Not required |
+| GET | `/config` | Not required | Not required |
+| GET | `/logs` | Not required | Not required |
+| GET | `/diagnostics` | Not required | Not required |
+| POST | `/config` | Session OR | API Key |
+| POST | `/test-notification` | Session OR | API Key |
+| POST | `/reset` | Session OR | API Key |
+| GET | `/` | Not required | Not required |
+| GET | `/settings` | Login modal | N/A |
+| GET | `/diag` | Not required | Not required |
+| GET | `/api` | Not required | Not required |
+| POST | `/generate-key` | Not required | Not required |
+| GET | `/auth/status` | Not required | Not required |
+| POST | `/auth/setup` | Not required | Not required |
+| POST | `/auth/login` | Not required | Not required |
+| POST | `/auth/logout` | Not required | Not required |
 
 ### Authentication Methods
 
@@ -116,10 +143,81 @@ All Stage 6 commands, plus:
 | `a` | Show API auth status and key |
 | `a` + `a` | Generate new API key |
 | `a` + `A` | Toggle auth on/off |
+| `p` | Clear web password (reset web auth) |
 
 The 'a' command waits 3 seconds for a follow-up command.
 
+### Password Reset via Serial
+
+If you're locked out of the web interface:
+1. Connect to serial monitor (115200 baud)
+2. Press 'p' to clear the password
+3. Visit Settings page - you'll be prompted to create a new password
+
 ## REST API
+
+### Web Authentication Endpoints
+
+#### GET /auth/status
+
+Check current authentication status.
+
+**Response:**
+```json
+{
+  "passwordConfigured": true,
+  "loggedIn": false
+}
+```
+
+#### POST /auth/setup
+
+Create initial password (only works when no password is configured).
+
+**Request:**
+```json
+{
+  "password": "your-password",
+  "confirmPassword": "your-password"
+}
+```
+
+**Response:**
+```json
+{"success": true, "message": "Password created"}
+```
+
+Sets session cookie on success.
+
+#### POST /auth/login
+
+Login with password.
+
+**Request:**
+```json
+{"password": "your-password"}
+```
+
+**Response (success):**
+```json
+{"success": true, "message": "Login successful"}
+```
+
+**Response (failure):**
+```json
+{"success": false, "message": "Invalid password"}
+```
+
+Sets session cookie on success.
+
+#### POST /auth/logout
+
+End current session.
+
+**Response:**
+```json
+{"success": true, "message": "Logged out"}
+```
 
 ### GET /diagnostics (Updated)
 
@@ -225,36 +323,50 @@ Overall: ALL TESTS PASSED
 
 | Component | Approximate Size |
 |-----------|------------------|
-| Program Storage | 1,145 KB (87%) |
+| Program Storage | 1,165 KB (88%) |
 | Global Variables | 48 KB (14%) |
 | **Available RAM** | **~279 KB** |
 
 ## Security Considerations
 
-1. **Key Storage**: API key is stored in NVS (flash memory). Physical access to the device could allow key extraction.
+1. **Password Storage**: Web passwords are hashed using SHA-256. The hash is stored in NVS (flash memory). Physical access could allow hash extraction (but not the plaintext password).
 
-2. **Transport Security**: Communication is over HTTP (not HTTPS). For sensitive deployments, use a VPN or isolate the device network.
+2. **Key Storage**: API key is stored in plaintext in NVS. Physical access to the device could allow key extraction.
 
-3. **Rate Limiting**: After 5 failed attempts, the device locks out for 5 minutes. This prevents brute-force attacks.
+3. **Transport Security**: Communication is over HTTP (not HTTPS). For sensitive deployments, use a VPN or isolate the device network.
 
-4. **Key Regeneration**: Regenerating a key immediately invalidates the old key. Ensure you update all clients.
+4. **Session Security**: Session tokens are 32-character random strings. Sessions expire after 1 hour and only one session can be active at a time.
 
-5. **Factory Reset**: Factory reset clears the API key along with all other settings.
+5. **Rate Limiting**: After 5 failed API key attempts, the device locks out for 5 minutes. This prevents brute-force attacks.
+
+6. **Key Regeneration**: Regenerating a key immediately invalidates the old key. Ensure you update all clients.
+
+7. **Factory Reset**: Factory reset clears both the web password and API key along with all other settings.
+
+8. **Serial Access**: Anyone with physical serial access can reset the password (press 'p') or perform factory reset (press 'f'). Secure physical access to the device.
 
 ## Troubleshooting
 
-### "Authentication required" error
+### Can't access Settings page (login required)
 
-1. Verify auth is enabled: Check `/diagnostics` or serial command 'd'
+1. If you forgot your password, use serial console and press 'p' to reset
+2. After resetting, visit Settings page to create a new password
+3. Session expires after 1 hour - simply login again
+
+### "Authentication required" error (API)
+
+1. Verify API key auth is enabled: Check `/diagnostics` or serial command 'd'
 2. Check key format: Must be 36-character UUID
 3. Try both methods: Header (`X-API-Key`) and query parameter (`?apiKey=`)
 4. Check for lockout: Look for `authLockoutRemaining` in `/diagnostics`
+5. If logged in via browser, your session cookie should also work for POST requests
 
 ### Locked out of device
 
 1. Wait 5 minutes for lockout to expire, OR
 2. Use serial console:
-   - Press 'a', then 'A' to toggle auth off
+   - Press 'p' to clear web password
+   - Press 'a', then 'A' to toggle API key auth off
    - Press 'f' for factory reset (clears all settings)
 
 ### Key not working after regeneration
@@ -315,10 +427,12 @@ print(response.json())
 
 ## Next Steps
 
-Stage 7 completes the core functionality. Future enhancements could include:
+Stage 7 completes the core functionality with full authentication. Future enhancements could include:
 
 - HTTPS/TLS support (requires significant flash space)
 - Multiple API keys with different permissions
+- Multiple user accounts with roles
 - OAuth2 integration
 - MQTT with authentication
 - OTA (Over-The-Air) firmware updates
+- Two-factor authentication

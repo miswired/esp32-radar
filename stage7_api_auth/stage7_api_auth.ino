@@ -40,6 +40,7 @@
 #include <Preferences.h>
 #include <rom/rtc.h>
 #include <esp_task_wdt.h>  // Watchdog timer
+#include <mbedtls/sha256.h>  // SHA-256 for password hashing
 #include "credentials.h"  // WiFi credentials (copy credentials.h.example to credentials.h)
 
 // ============================================================================
@@ -61,10 +62,16 @@
 #define EVENT_LOG_SIZE 50           // Number of events to keep in circular buffer
 #define HEAP_HISTORY_SIZE 60        // Number of heap samples to keep (1 per minute = 1 hour)
 
-// Authentication constants (Stage 7)
+// API Key Authentication constants (Stage 7)
 #define AUTH_MAX_FAILURES 5         // Max failed attempts before lockout
 #define AUTH_LOCKOUT_SECONDS 300    // Lockout duration (5 minutes)
 #define API_KEY_LENGTH 36           // UUID format: 8-4-4-4-12 = 36 chars
+
+// Web Password Authentication constants (Stage 7)
+#define PASSWORD_HASH_LENGTH 64     // SHA-256 hex string length
+#define SESSION_TOKEN_LENGTH 32     // Random hex token length
+#define SESSION_TIMEOUT_MS 3600000  // 1 hour session timeout
+#define MIN_PASSWORD_LENGTH 6       // Minimum password length
 
 // ============================================================================
 // DEFAULT VALUES FOR CONFIGURABLE SETTINGS
@@ -97,9 +104,12 @@ struct Config {
   char notifyUrl[128];
   uint8_t notifyMethod;  // 0 = GET, 1 = POST
 
-  // Authentication settings (Stage 7)
+  // API Key Authentication settings (Stage 7)
   bool authEnabled;
   char apiKey[API_KEY_LENGTH + 1];  // UUID + null terminator
+
+  // Web Password Authentication settings (Stage 7)
+  char passwordHash[PASSWORD_HASH_LENGTH + 1];  // SHA-256 hex + null terminator
 
   // Checksum to validate stored data
   uint32_t checksum;
@@ -179,6 +189,15 @@ bool watchdogEnabled = false;
 // Authentication state (Stage 7)
 uint8_t authFailCount = 0;
 unsigned long authLockoutUntil = 0;  // millis() when lockout expires
+
+// Web Password Session (Stage 7)
+struct Session {
+  char token[SESSION_TOKEN_LENGTH + 1];  // Session token (hex string)
+  unsigned long expiresAt;               // millis() when session expires
+  bool active;                           // Is session valid
+};
+
+Session currentSession = {"", 0, false};
 
 // Forward declaration for event logging
 void logEvent(EventType type, int32_t data = 0);
@@ -280,6 +299,9 @@ void setDefaultConfig() {
   config.authEnabled = false;
   config.apiKey[0] = '\0';
 
+  // Web Password defaults (Stage 7) - empty means no password configured
+  config.passwordHash[0] = '\0';
+
   config.checksum = calculateChecksum(&config);
 
   Serial.println("Configuration set to defaults");
@@ -343,6 +365,8 @@ bool loadConfig() {
     Serial.print(config.apiKey[3]);
     Serial.println("****-****-****-************");
   }
+  Serial.print("  Web Password: ");
+  Serial.println(strlen(config.passwordHash) > 0 ? "Configured" : "Not configured");
 
   return true;
 }
@@ -536,6 +560,125 @@ unsigned long getAuthLockoutRemaining() {
 }
 
 // ============================================================================
+// WEB PASSWORD AUTHENTICATION (Stage 7)
+// ============================================================================
+
+// Check if a web password has been configured
+bool isPasswordConfigured() {
+  return strlen(config.passwordHash) > 0;
+}
+
+// Hash a password using SHA-256, returns hex string
+void hashPassword(const char* password, char* outputHash) {
+  unsigned char hash[32];  // SHA-256 produces 32 bytes
+
+  mbedtls_sha256_context ctx;
+  mbedtls_sha256_init(&ctx);
+  mbedtls_sha256_starts(&ctx, 0);  // 0 = SHA-256 (not SHA-224)
+  mbedtls_sha256_update(&ctx, (const unsigned char*)password, strlen(password));
+  mbedtls_sha256_finish(&ctx, hash);
+  mbedtls_sha256_free(&ctx);
+
+  // Convert to hex string
+  const char* hexChars = "0123456789abcdef";
+  for (int i = 0; i < 32; i++) {
+    outputHash[i * 2] = hexChars[(hash[i] >> 4) & 0x0F];
+    outputHash[i * 2 + 1] = hexChars[hash[i] & 0x0F];
+  }
+  outputHash[64] = '\0';
+}
+
+// Verify a password against stored hash
+bool verifyPassword(const char* password) {
+  if (!isPasswordConfigured()) {
+    return false;
+  }
+
+  char computedHash[PASSWORD_HASH_LENGTH + 1];
+  hashPassword(password, computedHash);
+
+  return strcmp(computedHash, config.passwordHash) == 0;
+}
+
+// Generate a random session token using hardware RNG
+void generateSessionToken(char* buffer) {
+  const char* hexChars = "0123456789abcdef";
+
+  for (int i = 0; i < SESSION_TOKEN_LENGTH; i += 8) {
+    uint32_t r = esp_random();
+    for (int j = 0; j < 8 && (i + j) < SESSION_TOKEN_LENGTH; j++) {
+      buffer[i + j] = hexChars[(r >> (j * 4)) & 0xF];
+    }
+  }
+  buffer[SESSION_TOKEN_LENGTH] = '\0';
+}
+
+// Create a new session (invalidates any existing session)
+void createSession() {
+  generateSessionToken(currentSession.token);
+  currentSession.expiresAt = millis() + SESSION_TIMEOUT_MS;
+  currentSession.active = true;
+
+  Serial.println("[AUTH] New web session created");
+}
+
+// Validate a session token from cookie
+bool validateSession(const String& token) {
+  // No active session
+  if (!currentSession.active) {
+    return false;
+  }
+
+  // Check expiration
+  if (millis() >= currentSession.expiresAt) {
+    clearSession();
+    Serial.println("[AUTH] Session expired");
+    return false;
+  }
+
+  // Compare tokens
+  if (token == currentSession.token) {
+    // Refresh session expiration on valid access
+    currentSession.expiresAt = millis() + SESSION_TIMEOUT_MS;
+    return true;
+  }
+
+  return false;
+}
+
+// Clear current session (logout)
+void clearSession() {
+  currentSession.token[0] = '\0';
+  currentSession.expiresAt = 0;
+  currentSession.active = false;
+
+  Serial.println("[AUTH] Session cleared");
+}
+
+// Get session token from request cookie
+String getSessionFromCookie() {
+  if (server.hasHeader("Cookie")) {
+    String cookie = server.header("Cookie");
+    int start = cookie.indexOf("session=");
+    if (start >= 0) {
+      start += 8;  // Length of "session="
+      int end = cookie.indexOf(";", start);
+      if (end < 0) {
+        end = cookie.length();
+      }
+      return cookie.substring(start, end);
+    }
+  }
+  return "";
+}
+
+// Check if current request has valid web session
+bool hasValidSession() {
+  String token = getSessionFromCookie();
+  return token.length() > 0 && validateSession(token);
+}
+
+// ============================================================================
 // HTML DASHBOARD
 // ============================================================================
 
@@ -665,6 +808,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <a href="/settings">Settings</a>
       <a href="/diag">Diagnostics</a>
       <a href="/api">API</a>
+      <a href="#" id="authBtn" style="display:none;">Login</a>
     </div>
   </nav>
 
@@ -734,7 +878,14 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
   </div>
 
   <script>
-    function updateStatus() {
+    const formatUptime = (seconds) => {
+      if (seconds < 60) return seconds + 's';
+      if (seconds < 3600) return Math.floor(seconds / 60) + 'm';
+      if (seconds < 86400) return Math.floor(seconds / 3600) + 'h';
+      return Math.floor(seconds / 86400) + 'd';
+    };
+
+    const updateStatus = () => {
       fetch('/status')
         .then(response => response.json())
         .then(data => {
@@ -779,18 +930,34 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         .catch(err => {
           document.getElementById('state').textContent = 'Error';
         });
-    }
-
-    function formatUptime(seconds) {
-      if (seconds < 60) return seconds + 's';
-      if (seconds < 3600) return Math.floor(seconds / 60) + 'm';
-      if (seconds < 86400) return Math.floor(seconds / 3600) + 'h';
-      return Math.floor(seconds / 86400) + 'd';
-    }
+    };
 
     // Update every second
     setInterval(updateStatus, 1000);
     updateStatus();
+
+    // Auth button handling
+    const handleLogout = () => {
+      fetch('/auth/logout', { method: 'POST' })
+        .then(() => { checkAuthStatus(); })
+        .catch(err => console.log('Logout failed'));
+    };
+
+    const checkAuthStatus = () => {
+      fetch('/auth/status')
+        .then(response => response.json())
+        .then(data => {
+          const btn = document.getElementById('authBtn');
+          if (data.passwordConfigured) {
+            btn.style.display = 'block';
+            btn.textContent = data.loggedIn ? 'Logout' : 'Login';
+            btn.onclick = data.loggedIn ? handleLogout : () => { window.location.href = '/settings'; };
+          }
+        })
+        .catch(err => console.log('Auth check failed'));
+    };
+
+    checkAuthStatus();
   </script>
 </body>
 </html>
@@ -993,6 +1160,91 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
     .toast.hiding {
       animation: fadeOut 0.2s ease-out forwards;
     }
+    /* Modal Styles for Login/Password Setup */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-overlay.hidden {
+      display: none;
+    }
+    .modal {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 30px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+    .modal h2 {
+      color: #00d4ff;
+      margin-bottom: 10px;
+      font-size: 20px;
+    }
+    .modal p {
+      color: #aaa;
+      margin-bottom: 20px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .modal .form-group {
+      margin-bottom: 15px;
+    }
+    .modal .warning {
+      background: #7c2d12;
+      border: 1px solid #c2410c;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 20px;
+      font-size: 12px;
+      color: #fed7aa;
+    }
+    .modal .warning strong {
+      color: #fb923c;
+    }
+    .modal .requirements {
+      font-size: 12px;
+      color: #888;
+      margin-top: 5px;
+    }
+    .modal .error-message {
+      color: #ef4444;
+      font-size: 13px;
+      margin-top: 10px;
+      display: none;
+    }
+    .modal .error-message.visible {
+      display: block;
+    }
+    .password-field {
+      position: relative;
+    }
+    .password-field input {
+      padding-right: 60px;
+    }
+    .password-toggle {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .password-toggle:hover { color: #fff; }
+    .settings-hidden {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
@@ -1003,10 +1255,63 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
       <a href="/settings" class="active">Settings</a>
       <a href="/diag">Diagnostics</a>
       <a href="/api">API</a>
+      <a href="#" id="authBtn" style="display:none;">Login</a>
     </div>
   </nav>
 
-  <div class="container">
+  <!-- Password Setup Modal -->
+  <div id="setupModal" class="modal-overlay hidden">
+    <div class="modal">
+      <h2>Create Password</h2>
+      <p>Secure your settings page with a password. This password is separate from the API key.</p>
+      <div class="warning">
+        <strong>Security Notice:</strong> This device uses HTTP (not HTTPS). Your password will be transmitted unencrypted. Use only on trusted networks.
+      </div>
+      <form id="setupForm">
+        <div class="form-group">
+          <label for="setupPassword">Password</label>
+          <div class="password-field">
+            <input type="password" id="setupPassword" name="password" required>
+            <button type="button" class="password-toggle" onclick="togglePassword('setupPassword', this)">Show</button>
+          </div>
+          <div class="requirements">Minimum 6 characters. Consider using numbers and special characters.</div>
+        </div>
+        <div class="form-group">
+          <label for="setupConfirm">Confirm Password</label>
+          <div class="password-field">
+            <input type="password" id="setupConfirm" name="confirmPassword" required>
+            <button type="button" class="password-toggle" onclick="togglePassword('setupConfirm', this)">Show</button>
+          </div>
+        </div>
+        <div id="setupError" class="error-message"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin:0;">Create Password</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Login Modal -->
+  <div id="loginModal" class="modal-overlay hidden">
+    <div class="modal">
+      <h2>Login Required</h2>
+      <p>Enter your password to access settings.</p>
+      <div class="warning">
+        <strong>Security Notice:</strong> This device uses HTTP (not HTTPS). Your password will be transmitted unencrypted. Use only on trusted networks.
+      </div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <div class="password-field">
+            <input type="password" id="loginPassword" name="password" required>
+            <button type="button" class="password-toggle" onclick="togglePassword('loginPassword', this)">Show</button>
+          </div>
+        </div>
+        <div id="loginError" class="error-message"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin:0;">Login</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="container" id="settingsContainer">
     <form id="settingsForm">
       <div class="card">
         <h2>WiFi Configuration</h2>
@@ -1101,18 +1406,19 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
   <script>
     // Store API key for authenticated requests
     let currentApiKey = localStorage.getItem('esp32_api_key') || '';
+    let isLoggedIn = false;
 
     // Helper to make authenticated fetch requests
-    function authFetch(url, options = {}) {
+    const authFetch = (url, options = {}) => {
       if (currentApiKey) {
         options.headers = options.headers || {};
         options.headers['X-API-Key'] = currentApiKey;
       }
       return fetch(url, options);
-    }
+    };
 
     // Toast notification system
-    function showToast(message, type = 'success', duration = 4000) {
+    const showToast = (message, type = 'success', duration = 4000) => {
       const container = document.getElementById('toastContainer');
       const toast = document.createElement('div');
       toast.className = 'toast ' + type;
@@ -1130,10 +1436,174 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
           setTimeout(() => toast.remove(), 200);
         }, duration);
       }
-    }
+    };
 
-    // Load current settings
-    authFetch('/config')
+    // Toggle password visibility (using const to avoid Arduino preprocessor issue)
+    const togglePassword = (inputId, btn) => {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = 'Hide';
+      } else {
+        input.type = 'password';
+        btn.textContent = 'Show';
+      }
+    };
+
+    // Update auth button state
+    const updateAuthButton = (loggedIn, passwordConfigured) => {
+      const btn = document.getElementById('authBtn');
+      if (passwordConfigured) {
+        btn.style.display = 'block';
+        btn.textContent = loggedIn ? 'Logout' : 'Login';
+        btn.onclick = loggedIn ? handleLogout : () => showLoginModal();
+      } else {
+        btn.style.display = 'none';
+      }
+    };
+
+    // Show/hide modals
+    const showSetupModal = () => {
+      document.getElementById('setupModal').classList.remove('hidden');
+      document.getElementById('settingsContainer').classList.add('settings-hidden');
+    };
+
+    const hideSetupModal = () => {
+      document.getElementById('setupModal').classList.add('hidden');
+      document.getElementById('settingsContainer').classList.remove('settings-hidden');
+    };
+
+    const showLoginModal = () => {
+      document.getElementById('loginModal').classList.remove('hidden');
+      document.getElementById('settingsContainer').classList.add('settings-hidden');
+    };
+
+    const hideLoginModal = () => {
+      document.getElementById('loginModal').classList.add('hidden');
+      document.getElementById('settingsContainer').classList.remove('settings-hidden');
+    };
+
+    // Handle logout
+    const handleLogout = () => {
+      fetch('/auth/logout', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+          isLoggedIn = false;
+          updateAuthButton(false, true);
+          showLoginModal();
+          showToast('Logged out successfully', 'success');
+        })
+        .catch(err => {
+          showToast('Error logging out', 'error');
+        });
+    };
+
+    // Check auth status and show appropriate modal
+    const checkAuthStatus = () => {
+      return fetch('/auth/status')
+        .then(response => response.json())
+        .then(data => {
+          const passwordConfigured = data.passwordConfigured;
+          isLoggedIn = data.loggedIn;
+
+          updateAuthButton(isLoggedIn, passwordConfigured);
+
+          if (!passwordConfigured) {
+            // First time - show setup modal
+            showSetupModal();
+            return false;
+          } else if (!isLoggedIn) {
+            // Password set but not logged in - show login modal
+            showLoginModal();
+            return false;
+          }
+          // Logged in - show settings
+          return true;
+        })
+        .catch(err => {
+          console.log('Auth check failed:', err);
+          return true; // Show settings on error
+        });
+    };
+
+    // Password setup form
+    document.getElementById('setupForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const password = document.getElementById('setupPassword').value;
+      const confirm = document.getElementById('setupConfirm').value;
+      const errorEl = document.getElementById('setupError');
+
+      if (password.length < 6) {
+        errorEl.textContent = 'Password must be at least 6 characters';
+        errorEl.classList.add('visible');
+        return;
+      }
+
+      if (password !== confirm) {
+        errorEl.textContent = 'Passwords do not match';
+        errorEl.classList.add('visible');
+        return;
+      }
+
+      errorEl.classList.remove('visible');
+
+      fetch('/auth/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: password, confirmPassword: confirm })
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            isLoggedIn = true;
+            hideSetupModal();
+            updateAuthButton(true, true);
+            showToast('Password created successfully', 'success');
+            loadConfig();
+          } else {
+            errorEl.textContent = data.message || 'Failed to create password';
+            errorEl.classList.add('visible');
+          }
+        })
+        .catch(err => {
+          errorEl.textContent = 'Error creating password';
+          errorEl.classList.add('visible');
+        });
+    });
+
+    // Login form
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const password = document.getElementById('loginPassword').value;
+      const errorEl = document.getElementById('loginError');
+
+      fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: password })
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            isLoggedIn = true;
+            hideLoginModal();
+            updateAuthButton(true, true);
+            showToast('Login successful', 'success');
+            loadConfig();
+          } else {
+            errorEl.textContent = data.message || 'Invalid password';
+            errorEl.classList.add('visible');
+          }
+        })
+        .catch(err => {
+          errorEl.textContent = 'Error logging in';
+          errorEl.classList.add('visible');
+        });
+    });
+
+    // Load config function
+    const loadConfig = () => {
+      authFetch('/config')
       .then(response => {
         if (response.status === 401 || response.status === 429) {
           document.getElementById('authStatus').textContent = 'Authentication required. Enter API key or disable auth via serial.';
@@ -1159,6 +1629,14 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
         }
       })
       .catch(err => console.log('Config load:', err.message));
+    };
+
+    // Initial auth check - show modal or load config
+    checkAuthStatus().then(loggedIn => {
+      if (loggedIn) {
+        loadConfig();
+      }
+    });
 
     // Save settings
     document.getElementById('settingsForm').addEventListener('submit', function(e) {
@@ -1467,6 +1945,7 @@ const char API_HTML[] PROGMEM = R"rawliteral(
       <a href="/settings">Settings</a>
       <a href="/diag">Diagnostics</a>
       <a href="/api" class="active">API</a>
+      <a href="#" id="authBtn" style="display:none;">Login</a>
     </div>
   </nav>
 
@@ -1710,6 +2189,31 @@ const char API_HTML[] PROGMEM = R"rawliteral(
       <p style="margin-top: 10px;">Note: This endpoint does not require authentication. The generated key must be saved via POST /config to take effect.</p>
     </div>
   </div>
+
+  <script>
+    // Auth button handling
+    const handleLogout = () => {
+      fetch('/auth/logout', { method: 'POST' })
+        .then(() => { checkAuthStatus(); })
+        .catch(err => console.log('Logout failed'));
+    };
+
+    const checkAuthStatus = () => {
+      fetch('/auth/status')
+        .then(response => response.json())
+        .then(data => {
+          const btn = document.getElementById('authBtn');
+          if (data.passwordConfigured) {
+            btn.style.display = 'block';
+            btn.textContent = data.loggedIn ? 'Logout' : 'Login';
+            btn.onclick = data.loggedIn ? handleLogout : () => { window.location.href = '/settings'; };
+          }
+        })
+        .catch(err => console.log('Auth check failed'));
+    };
+
+    checkAuthStatus();
+  </script>
 </body>
 </html>
 )rawliteral";
@@ -1898,6 +2402,7 @@ const char DIAGNOSTICS_HTML[] PROGMEM = R"rawliteral(
       <a href="/settings">Settings</a>
       <a href="/diag" class="active">Diagnostics</a>
       <a href="/api">API</a>
+      <a href="#" id="authBtn" style="display:none;">Login</a>
     </div>
   </nav>
 
@@ -1981,14 +2486,14 @@ const char DIAGNOSTICS_HTML[] PROGMEM = R"rawliteral(
   <script>
     let refreshInterval;
 
-    function getEventClass(event) {
+    const getEventClass = (event) => {
       if (event.includes('ALARM')) return 'alarm';
       if (event.includes('NOTIFY')) return 'notify';
       if (event.includes('WIFI')) return 'wifi';
       return 'system';
-    }
+    };
 
-    function formatData(event, data) {
+    const formatData = (event, data) => {
       if (!data) return '';
       switch (event) {
         case 'WIFI_CONNECTED': return data + ' dBm';
@@ -2000,9 +2505,9 @@ const char DIAGNOSTICS_HTML[] PROGMEM = R"rawliteral(
         case 'HEAP_LOW': return Math.round(data / 1024) + ' KB';
         default: return data;
       }
-    }
+    };
 
-    async function fetchDiagnostics() {
+    const fetchDiagnostics = async () => {
       try {
         const res = await fetch('/diagnostics');
         const data = await res.json();
@@ -2034,9 +2539,9 @@ const char DIAGNOSTICS_HTML[] PROGMEM = R"rawliteral(
       } catch (e) {
         console.error('Failed to fetch diagnostics:', e);
       }
-    }
+    };
 
-    async function fetchLogs() {
+    const fetchLogs = async () => {
       try {
         const res = await fetch('/logs');
         const data = await res.json();
@@ -2061,9 +2566,9 @@ const char DIAGNOSTICS_HTML[] PROGMEM = R"rawliteral(
         document.getElementById('logContainer').innerHTML =
           '<div class="empty-log">Failed to load events</div>';
       }
-    }
+    };
 
-    function toggleAutoRefresh() {
+    const toggleAutoRefresh = () => {
       if (document.getElementById('autoRefresh').checked) {
         refreshInterval = setInterval(() => {
           fetchDiagnostics();
@@ -2072,7 +2577,7 @@ const char DIAGNOSTICS_HTML[] PROGMEM = R"rawliteral(
       } else {
         clearInterval(refreshInterval);
       }
-    }
+    };
 
     document.getElementById('autoRefresh').addEventListener('change', toggleAutoRefresh);
 
@@ -2080,6 +2585,29 @@ const char DIAGNOSTICS_HTML[] PROGMEM = R"rawliteral(
     fetchDiagnostics();
     fetchLogs();
     toggleAutoRefresh();
+
+    // Auth button handling
+    const handleLogout = () => {
+      fetch('/auth/logout', { method: 'POST' })
+        .then(() => { checkAuthStatus(); })
+        .catch(err => console.log('Logout failed'));
+    };
+
+    const checkAuthStatus = () => {
+      fetch('/auth/status')
+        .then(response => response.json())
+        .then(data => {
+          const btn = document.getElementById('authBtn');
+          if (data.passwordConfigured) {
+            btn.style.display = 'block';
+            btn.textContent = data.loggedIn ? 'Logout' : 'Login';
+            btn.onclick = data.loggedIn ? handleLogout : () => { window.location.href = '/settings'; };
+          }
+        })
+        .catch(err => console.log('Auth check failed'));
+    };
+
+    checkAuthStatus();
   </script>
 </body>
 </html>
@@ -2482,8 +3010,13 @@ void handleGetConfig() {
 }
 
 void handlePostConfig() {
-  // No auth required - web UI needs to save settings even when auth is enabled
-  // Web interface will have separate password protection
+  // Dual auth: Allow if API key is valid OR web session is valid
+  // This allows both external API access (curl, Home Assistant) and web UI
+  if (config.authEnabled && !hasValidSession() && !checkAuthentication()) {
+    sendAuthError();
+    return;
+  }
+
   if (!server.hasArg("plain")) {
     server.send(400, "application/json", "{\"success\":false,\"message\":\"No data received\"}");
     return;
@@ -2645,16 +3178,24 @@ void handlePostConfig() {
 }
 
 void handleReset() {
-  // No auth required - web UI needs to perform reset even when auth is enabled
-  // Web interface will have separate password protection
+  // Dual auth: Allow if API key is valid OR web session is valid
+  if (config.authEnabled && !hasValidSession() && !checkAuthentication()) {
+    sendAuthError();
+    return;
+  }
+
   server.send(200, "application/json", "{\"success\":true,\"message\":\"Factory reset initiated\"}");
   delay(1000);
   factoryReset();
 }
 
 void handleTestNotification() {
-  // No auth required - web UI needs to test notifications even when auth is enabled
-  // Web interface will have separate password protection
+  // Dual auth: Allow if API key is valid OR web session is valid
+  if (config.authEnabled && !hasValidSession() && !checkAuthentication()) {
+    sendAuthError();
+    return;
+  }
+
   if (currentWiFiMode != MODE_STATION) {
     server.send(400, "application/json", "{\"success\":false,\"message\":\"Not connected to WiFi\"}");
     return;
@@ -2859,10 +3400,125 @@ void handleGenerateKey() {
   server.send(200, "application/json", response);
 }
 
+// ============================================================================
+// WEB PASSWORD AUTH ENDPOINTS
+// ============================================================================
+
+// GET /auth/status - Check authentication state
+void handleAuthStatus() {
+  JsonDocument doc;
+  doc["passwordConfigured"] = isPasswordConfigured();
+  doc["loggedIn"] = hasValidSession();
+
+  String response;
+  serializeJson(doc, response);
+  server.send(200, "application/json", response);
+}
+
+// POST /auth/setup - Create initial password
+void handleAuthSetup() {
+  // Only allow setup if no password is configured
+  if (isPasswordConfigured()) {
+    server.send(400, "application/json", "{\"success\":false,\"message\":\"Password already configured\"}");
+    return;
+  }
+
+  if (!server.hasArg("plain")) {
+    server.send(400, "application/json", "{\"success\":false,\"message\":\"No data received\"}");
+    return;
+  }
+
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, server.arg("plain"));
+  if (error) {
+    server.send(400, "application/json", "{\"success\":false,\"message\":\"Invalid JSON\"}");
+    return;
+  }
+
+  const char* password = doc["password"] | "";
+  const char* confirmPassword = doc["confirmPassword"] | "";
+
+  // Validate password length
+  if (strlen(password) < MIN_PASSWORD_LENGTH) {
+    server.send(400, "application/json", "{\"success\":false,\"message\":\"Password must be at least 6 characters\"}");
+    return;
+  }
+
+  // Validate passwords match
+  if (strcmp(password, confirmPassword) != 0) {
+    server.send(400, "application/json", "{\"success\":false,\"message\":\"Passwords do not match\"}");
+    return;
+  }
+
+  // Hash and store the password
+  hashPassword(password, config.passwordHash);
+  if (!saveConfig()) {
+    config.passwordHash[0] = '\0';
+    server.send(500, "application/json", "{\"success\":false,\"message\":\"Failed to save password\"}");
+    return;
+  }
+
+  // Create a session for the new user
+  createSession();
+
+  // Send response with session cookie
+  String cookie = "session=" + String(currentSession.token) + "; Path=/; SameSite=Strict";
+  server.sendHeader("Set-Cookie", cookie);
+  server.send(200, "application/json", "{\"success\":true,\"message\":\"Password created\"}");
+
+  Serial.println("[AUTH] Web password configured");
+}
+
+// POST /auth/login - Authenticate with password
+void handleAuthLogin() {
+  if (!isPasswordConfigured()) {
+    server.send(400, "application/json", "{\"success\":false,\"message\":\"No password configured\"}");
+    return;
+  }
+
+  if (!server.hasArg("plain")) {
+    server.send(400, "application/json", "{\"success\":false,\"message\":\"No data received\"}");
+    return;
+  }
+
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, server.arg("plain"));
+  if (error) {
+    server.send(400, "application/json", "{\"success\":false,\"message\":\"Invalid JSON\"}");
+    return;
+  }
+
+  const char* password = doc["password"] | "";
+
+  if (verifyPassword(password)) {
+    // Create new session (invalidates any existing session)
+    createSession();
+
+    // Send response with session cookie
+    String cookie = "session=" + String(currentSession.token) + "; Path=/; SameSite=Strict";
+    server.sendHeader("Set-Cookie", cookie);
+    server.send(200, "application/json", "{\"success\":true,\"message\":\"Login successful\"}");
+
+    Serial.println("[AUTH] Web login successful");
+  } else {
+    server.send(401, "application/json", "{\"success\":false,\"message\":\"Invalid password\"}");
+    Serial.println("[AUTH] Web login failed - invalid password");
+  }
+}
+
+// POST /auth/logout - Clear session
+void handleAuthLogout() {
+  clearSession();
+
+  // Clear session cookie
+  server.sendHeader("Set-Cookie", "session=; Path=/; SameSite=Strict; Max-Age=0");
+  server.send(200, "application/json", "{\"success\":true,\"message\":\"Logged out\"}");
+}
+
 void setupWebServer() {
-  // Collect X-API-Key header for authentication
-  const char* headerKeys[] = {"X-API-Key"};
-  server.collectHeaders(headerKeys, 1);
+  // Collect headers for authentication (API Key and Cookie for session)
+  const char* headerKeys[] = {"X-API-Key", "Cookie"};
+  server.collectHeaders(headerKeys, 2);
 
   server.on("/", HTTP_GET, handleRoot);
   server.on("/settings", HTTP_GET, handleSettings);
@@ -2876,6 +3532,11 @@ void setupWebServer() {
   server.on("/logs", HTTP_GET, handleLogs);
   server.on("/diagnostics", HTTP_GET, handleDiagnostics);
   server.on("/generate-key", HTTP_POST, handleGenerateKey);  // Stage 7
+  // Web password auth endpoints (Stage 7)
+  server.on("/auth/status", HTTP_GET, handleAuthStatus);
+  server.on("/auth/setup", HTTP_POST, handleAuthSetup);
+  server.on("/auth/login", HTTP_POST, handleAuthLogin);
+  server.on("/auth/logout", HTTP_POST, handleAuthLogout);
   server.onNotFound(handleNotFound);
 
   server.begin();
@@ -3150,6 +3811,7 @@ void handleSerialCommands() {
         Serial.println("l - Event log");
         Serial.println("d - Diagnostics");
         Serial.println("a - API key (show/generate)");
+        Serial.println("p - Web password (show/clear)");
         Serial.println("h - Help");
         Serial.println("r - Restart");
         Serial.println("i - System info");
@@ -3202,6 +3864,34 @@ void handleSerialCommands() {
                 saveConfig();
                 Serial.print("API Auth: ");
                 Serial.println(config.authEnabled ? "ENABLED" : "DISABLED");
+                break;
+              }
+            }
+          }
+        }
+        break;
+      case 'p':
+      case 'P':
+        Serial.println("\n=== WEB PASSWORD ===");
+        Serial.print("Status: ");
+        Serial.println(isPasswordConfigured() ? "CONFIGURED" : "NOT SET");
+        Serial.print("Session: ");
+        Serial.println(currentSession.active ? "ACTIVE" : "NONE");
+        Serial.println("\nCommands:");
+        Serial.println("  'p' again - Clear password (returns to setup state)");
+        Serial.println("====================\n");
+        {
+          // Wait for follow-up command
+          unsigned long waitStart = millis();
+          while (millis() - waitStart < 3000) {
+            if (Serial.available()) {
+              char subcmd = Serial.read();
+              if (subcmd == 'p') {
+                // Clear password
+                config.passwordHash[0] = '\0';
+                clearSession();
+                saveConfig();
+                Serial.println("Password cleared. Next Settings page visit will prompt for new password.");
                 break;
               }
             }
