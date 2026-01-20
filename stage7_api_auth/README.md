@@ -31,21 +31,13 @@ Same as previous stages:
 
 ### Overview
 
-Authentication is **disabled by default** for backwards compatibility. When enabled, only write operations (POST endpoints) require a valid API key. Read operations (GET endpoints) and HTML pages remain accessible without authentication, allowing the web UI to function normally.
+Authentication is **disabled by default** for backwards compatibility. The API key feature is intended for securing external integrations (scripts, Home Assistant, etc.) and does not restrict web UI access. The local web interface always functions fully, allowing administrators to manage settings without needing an API key.
 
-### Protected Endpoints (when auth enabled)
+### API Key Authentication Model
 
-Only write operations require authentication:
+The API key feature is designed for **external integrations** (curl, scripts, Home Assistant, etc.). The local web UI does not require API key authentication to function, allowing administrators to always access and modify settings through the browser.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/config` | Save configuration |
-| POST | `/test-notification` | Test notification |
-| POST | `/reset` | Factory reset |
-
-### Unprotected Endpoints (always accessible)
-
-Read operations and HTML pages are always accessible (allows web UI to function):
+**All endpoints are accessible without API key:**
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -53,11 +45,16 @@ Read operations and HTML pages are always accessible (allows web UI to function)
 | GET | `/config` | Configuration (JSON) |
 | GET | `/logs` | Event log (JSON) |
 | GET | `/diagnostics` | System diagnostics (JSON) |
+| POST | `/config` | Save configuration |
+| POST | `/test-notification` | Test notification |
+| POST | `/reset` | Factory reset |
 | GET | `/` | Dashboard page |
 | GET | `/settings` | Settings page |
 | GET | `/diag` | Diagnostics page |
 | GET | `/api` | API documentation |
 | POST | `/generate-key` | Generate new key (preview) |
+
+**Note:** A separate password protection mechanism for web access is planned for a future release.
 
 ### Authentication Methods
 

@@ -930,6 +930,69 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
       gap: 10px;
       margin-top: 20px;
     }
+    /* Toast Notification System */
+    .toast-container {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .toast {
+      background: #1a1a2e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 300px;
+      max-width: 90vw;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      animation: slideUp 0.3s ease-out;
+      pointer-events: auto;
+    }
+    .toast.success {
+      border-left: 4px solid #4ade80;
+    }
+    .toast.error {
+      border-left: 4px solid #ef4444;
+    }
+    .toast-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .toast.success .toast-icon { color: #4ade80; }
+    .toast.error .toast-icon { color: #ef4444; }
+    .toast-message {
+      flex: 1;
+      font-size: 14px;
+    }
+    .toast-close {
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      padding: 4px;
+      font-size: 18px;
+      line-height: 1;
+    }
+    .toast-close:hover { color: #fff; }
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    .toast.hiding {
+      animation: fadeOut 0.2s ease-out forwards;
+    }
   </style>
 </head>
 <body>
@@ -944,8 +1007,6 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
   </nav>
 
   <div class="container">
-    <div id="message" class="message"></div>
-
     <form id="settingsForm">
       <div class="card">
         <h2>WiFi Configuration</h2>
@@ -1050,6 +1111,27 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
       return fetch(url, options);
     }
 
+    // Toast notification system
+    function showToast(message, type = 'success', duration = 4000) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast ' + type;
+      const icon = type === 'success' ? '&#10004;' : '&#10006;';
+      toast.innerHTML =
+        '<span class="toast-icon">' + icon + '</span>' +
+        '<span class="toast-message">' + message + '</span>' +
+        '<button class="toast-close" onclick="this.parentElement.remove()">&times;</button>';
+      container.appendChild(toast);
+
+      // Auto-dismiss for success (errors stay until dismissed)
+      if (type === 'success' && duration > 0) {
+        setTimeout(() => {
+          toast.classList.add('hiding');
+          setTimeout(() => toast.remove(), 200);
+        }, duration);
+      }
+    }
+
     // Load current settings
     authFetch('/config')
       .then(response => {
@@ -1103,29 +1185,25 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
         currentApiKey = apiKeyField;
       }
 
-      authFetch('/config', {
+      fetch('/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       })
       .then(response => response.json())
       .then(data => {
-        const msgEl = document.getElementById('message');
         if (data.success) {
-          msgEl.className = 'message success';
-          msgEl.textContent = data.message + (data.restart ? ' Device will restart in 3 seconds...' : '');
+          const msg = data.message + (data.restart ? ' Device will restart...' : '');
+          showToast(msg, 'success', data.restart ? 0 : 4000);
           if (data.restart) {
             setTimeout(() => { window.location.href = '/'; }, 5000);
           }
         } else {
-          msgEl.className = 'message error';
-          msgEl.textContent = 'Error: ' + data.message;
+          showToast('Error: ' + data.message, 'error', 0);
         }
       })
       .catch(err => {
-        const msgEl = document.getElementById('message');
-        msgEl.className = 'message error';
-        msgEl.textContent = 'Error saving settings';
+        showToast('Error saving settings: ' + err.message, 'error', 0);
       });
     });
 
@@ -1168,14 +1246,15 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
     // Factory reset
     document.getElementById('resetBtn').addEventListener('click', function() {
       if (confirm('Are you sure you want to factory reset? All settings will be erased.')) {
-        authFetch('/reset', { method: 'POST' })
+        fetch('/reset', { method: 'POST' })
           .then(response => response.json())
           .then(data => {
-            const msgEl = document.getElementById('message');
-            msgEl.className = 'message success';
-            msgEl.textContent = 'Factory reset initiated. Device will restart...';
+            showToast('Factory reset initiated. Device will restart...', 'success', 0);
             // Clear stored API key on factory reset
             localStorage.removeItem('esp32_api_key');
+          })
+          .catch(err => {
+            showToast('Error initiating factory reset', 'error', 0);
           });
       }
     });
@@ -1223,6 +1302,7 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
         });
     });
   </script>
+  <div class="toast-container" id="toastContainer"></div>
 </body>
 </html>
 )rawliteral";
@@ -2402,11 +2482,8 @@ void handleGetConfig() {
 }
 
 void handlePostConfig() {
-  if (!checkAuthentication()) {
-    sendAuthError();
-    return;
-  }
-
+  // No auth required - web UI needs to save settings even when auth is enabled
+  // Web interface will have separate password protection
   if (!server.hasArg("plain")) {
     server.send(400, "application/json", "{\"success\":false,\"message\":\"No data received\"}");
     return;
@@ -2568,22 +2645,16 @@ void handlePostConfig() {
 }
 
 void handleReset() {
-  if (!checkAuthentication()) {
-    sendAuthError();
-    return;
-  }
-
+  // No auth required - web UI needs to perform reset even when auth is enabled
+  // Web interface will have separate password protection
   server.send(200, "application/json", "{\"success\":true,\"message\":\"Factory reset initiated\"}");
   delay(1000);
   factoryReset();
 }
 
 void handleTestNotification() {
-  if (!checkAuthentication()) {
-    sendAuthError();
-    return;
-  }
-
+  // No auth required - web UI needs to test notifications even when auth is enabled
+  // Web interface will have separate password protection
   if (currentWiFiMode != MODE_STATION) {
     server.send(400, "application/json", "{\"success\":false,\"message\":\"Not connected to WiFi\"}");
     return;
