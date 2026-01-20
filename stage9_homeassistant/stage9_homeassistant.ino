@@ -1582,11 +1582,13 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
         <details style="margin-top: 15px;">
           <summary style="cursor: pointer; color: #4a90d9;">MQTT Broker Setup Help</summary>
           <div style="margin-top: 10px; padding: 10px; background: #1a1a2e; border-radius: 8px; font-size: 13px;">
-            <p><strong>Home Assistant Add-on:</strong> Install "Mosquitto broker" from Add-on Store, then add MQTT integration.</p>
-            <p style="margin-top: 10px;"><strong>Docker Mosquitto:</strong></p>
-            <pre style="background: #0d0d1a; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 11px;">docker run -d --name mosquitto \\
-  -p 1883:1883 -p 9001:9001 \\
-  eclipse-mosquitto:2</pre>
+            <p style="margin-bottom: 10px;"><em>Choose ONE of these options:</em></p>
+            <p><strong>Option 1: Home Assistant Add-on</strong> (recommended)</p>
+            <p style="margin-left: 10px; color: #aaa;">Install "Mosquitto broker" from Settings &rarr; Add-ons &rarr; Add-on Store, then add the MQTT integration. Use your HA IP as the broker host.</p>
+            <p style="margin-top: 15px;"><strong>Option 2: Standalone Docker</strong></p>
+            <p style="margin-left: 10px; color: #aaa;">Run your own MQTT broker if not using Home Assistant OS:</p>
+            <pre style="background: #0d0d1a; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 11px; margin-top: 5px;">docker run -d --name mosquitto \\
+  -p 1883:1883 eclipse-mosquitto:2</pre>
           </div>
         </details>
       </div>
