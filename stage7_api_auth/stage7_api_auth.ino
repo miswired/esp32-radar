@@ -2336,11 +2336,7 @@ void handleDiagPage() {
 }
 
 void handleStatus() {
-  if (!checkAuthentication()) {
-    sendAuthError();
-    return;
-  }
-
+  // GET endpoints are not protected - allows web UI to function
   JsonDocument doc;
 
   doc["state"] = stateNames[currentState];
@@ -2370,10 +2366,7 @@ void handleStatus() {
 }
 
 void handleGetConfig() {
-  if (!checkAuthentication()) {
-    sendAuthError();
-    return;
-  }
+  // GET endpoints are not protected - allows web UI to function
 
   JsonDocument doc;
 
@@ -2684,11 +2677,7 @@ void handleTestNotification() {
 // ============================================================================
 
 void handleLogs() {
-  if (!checkAuthentication()) {
-    sendAuthError();
-    return;
-  }
-
+  // GET endpoints are not protected - allows web UI to function
   JsonDocument doc;
   JsonArray logs = doc["events"].to<JsonArray>();
 
@@ -2714,11 +2703,7 @@ void handleLogs() {
 }
 
 void handleDiagnostics() {
-  if (!checkAuthentication()) {
-    sendAuthError();
-    return;
-  }
-
+  // GET endpoints are not protected - allows web UI to function
   JsonDocument doc;
 
   // System info

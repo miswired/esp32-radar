@@ -31,24 +31,28 @@ Same as previous stages:
 
 ### Overview
 
-Authentication is **disabled by default** for backwards compatibility. When enabled, all JSON API endpoints require a valid API key, while HTML pages remain accessible without authentication.
+Authentication is **disabled by default** for backwards compatibility. When enabled, only write operations (POST endpoints) require a valid API key. Read operations (GET endpoints) and HTML pages remain accessible without authentication, allowing the web UI to function normally.
 
 ### Protected Endpoints (when auth enabled)
 
+Only write operations require authentication:
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/status` | Sensor status |
-| GET | `/config` | Configuration |
 | POST | `/config` | Save configuration |
-| GET | `/logs` | Event log |
-| GET | `/diagnostics` | System diagnostics |
 | POST | `/test-notification` | Test notification |
 | POST | `/reset` | Factory reset |
 
 ### Unprotected Endpoints (always accessible)
 
+Read operations and HTML pages are always accessible (allows web UI to function):
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| GET | `/status` | Sensor status (JSON) |
+| GET | `/config` | Configuration (JSON) |
+| GET | `/logs` | Event log (JSON) |
+| GET | `/diagnostics` | System diagnostics (JSON) |
 | GET | `/` | Dashboard page |
 | GET | `/settings` | Settings page |
 | GET | `/diag` | Diagnostics page |

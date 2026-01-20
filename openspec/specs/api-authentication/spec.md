@@ -45,18 +45,23 @@ The system SHALL support two methods for transmitting API keys.
 - **THEN** the system SHALL use the header value for authentication
 
 ### Requirement: Protected Endpoints
-The system SHALL require authentication for all JSON API endpoints when authentication is enabled.
+The system SHALL require authentication only for write operations (POST endpoints) when authentication is enabled. Read operations (GET endpoints) SHALL remain accessible to allow the web UI to function.
 
-#### Scenario: Protected endpoint list
+#### Scenario: Protected endpoint list (write operations)
 - **WHEN** API authentication is enabled
 - **THEN** the following endpoints SHALL require authentication:
-  - `GET /status`
-  - `GET /config`
-  - `POST /config`
-  - `GET /logs`
-  - `GET /diagnostics`
-  - `POST /test-notification`
-  - `POST /reset`
+  - `POST /config` (save configuration)
+  - `POST /test-notification` (send test notification)
+  - `POST /reset` (factory reset)
+
+#### Scenario: Unprotected GET endpoints (read operations)
+- **WHEN** API authentication is enabled
+- **THEN** the following JSON endpoints SHALL remain accessible without authentication:
+  - `GET /status` (sensor status)
+  - `GET /config` (current configuration)
+  - `GET /logs` (event log)
+  - `GET /diagnostics` (system diagnostics)
+- **AND** this allows the web UI dashboard, settings, and diagnostics pages to function normally
 
 #### Scenario: Unprotected HTML pages
 - **WHEN** API authentication is enabled
