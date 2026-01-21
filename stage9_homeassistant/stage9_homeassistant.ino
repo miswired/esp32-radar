@@ -3637,11 +3637,10 @@ void mqttPublishDiscoveryMotion() {
   doc["name"] = "Motion";
   doc["uniq_id"] = prefix + "_motion";
   doc["dev_cla"] = "motion";
-  doc["stat_t"] = "~/" + prefix + "/motion/state";
-  doc["avty_t"] = "~/" + prefix + "/availability";
+  doc["stat_t"] = mqttStateTopic;  // Use full path like sensors do
+  doc["avty_t"] = mqttAvailabilityTopic;  // Use full path like sensors do
   doc["pl_avail"] = "online";
   doc["pl_not_avail"] = "offline";
-  doc["~"] = String(MQTT_DISCOVERY_PREFIX) + "/binary_sensor";
 
   // Add device info
   JsonObject dev = doc["dev"].to<JsonObject>();
