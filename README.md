@@ -51,15 +51,15 @@ See [Wiring Guide](docs/hardware/WIRING.md) for detailed instructions.
 
 3. **Configure WiFi credentials**
    ```bash
-   cd stage9_homeassistant
+   cd firmware
    cp credentials.h.example credentials.h
    # Edit credentials.h with your WiFi details
    ```
 
 4. **Compile and upload**
    ```bash
-   arduino-cli compile --fqbn esp32:esp32:esp32 stage9_homeassistant
-   arduino-cli upload --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 stage9_homeassistant
+   arduino-cli compile --fqbn esp32:esp32:esp32 firmware
+   arduino-cli upload --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 firmware
    ```
 
 5. **Access web interface**
@@ -70,7 +70,7 @@ See [Wiring Guide](docs/hardware/WIRING.md) for detailed instructions.
 ## Documentation
 
 - [Getting Started Tutorial](https://github.com/miswired/esp32-radar/wiki/Getting-Started)
-- [Home Assistant Setup](stage9_homeassistant/HOME_ASSISTANT_SETUP.md)
+- [Home Assistant Setup](firmware/HOME_ASSISTANT_SETUP.md)
 - [API Reference](https://github.com/miswired/esp32-radar/wiki/API-Reference)
 - [Hardware Guide](docs/hardware/)
 - [Full Documentation (Wiki)](https://github.com/miswired/esp32-radar/wiki)
@@ -103,15 +103,17 @@ When connected via MQTT, the following entities are created:
 
 ```
 esp32-radar/
-├── stage9_homeassistant/   # Latest firmware with all features
-├── libs/                   # Archived Arduino libraries
-├── docs/                   # Additional documentation
-│   └── hardware/          # BOM and wiring guides
-├── openspec/              # Feature specifications
-├── LICENSE                # GPL v3
-├── CONTRIBUTING.md        # Contribution guidelines
-├── CODE_OF_CONDUCT.md     # Community standards
-└── CHANGELOG.md           # Version history
+├── firmware/              # Latest firmware (compile this!)
+├── libs/                  # Archived Arduino libraries
+├── docs/                  # Additional documentation
+│   └── hardware/         # BOM and wiring guides
+├── archive/              # Historical development stages
+│   └── stages/           # Stage 1-9 source code
+├── openspec/             # Feature specifications
+├── LICENSE               # GPL v3
+├── CONTRIBUTING.md       # Contribution guidelines
+├── CODE_OF_CONDUCT.md    # Community standards
+└── CHANGELOG.md          # Version history
 ```
 
 ## Contributing

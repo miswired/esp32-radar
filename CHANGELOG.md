@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] - Project Reorganization
+
+### Changed
+- Moved all development stages to `archive/stages/` for cleaner project structure
+- Created `firmware/` folder with latest production firmware
+- Renamed main sketch to `firmware.ino` for Arduino compatibility
+
+### Added
+- `archive/stages/README.md` documenting all development stages
+
 ## [Stage 9] - Home Assistant MQTT Integration
 
 ### Added

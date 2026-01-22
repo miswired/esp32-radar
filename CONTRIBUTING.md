@@ -42,7 +42,7 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
 3. **Make your changes** following the code style guidelines below.
 
 4. **Test your changes**:
-   - Compile successfully with `arduino-cli compile --fqbn esp32:esp32:esp32 stage9_homeassistant`
+   - Compile successfully with `arduino-cli compile --fqbn esp32:esp32:esp32 firmware`
    - Test on actual hardware if possible
    - Verify web interface functions correctly
 
@@ -104,10 +104,10 @@ docs: Update Home Assistant setup guide
 arduino-cli lib install ArduinoJson PubSubClient
 
 # Compile
-arduino-cli compile --fqbn esp32:esp32:esp32 stage9_homeassistant
+arduino-cli compile --fqbn esp32:esp32:esp32 firmware
 
 # Upload
-arduino-cli upload --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 stage9_homeassistant
+arduino-cli upload --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 firmware
 ```
 
 ### Testing
@@ -121,12 +121,14 @@ arduino-cli upload --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 stage9_homeassistant
 
 ```
 esp32-radar/
-├── stage9_homeassistant/    # Latest stage with all features
-│   ├── stage9_homeassistant.ino   # Main source file
-│   ├── credentials.h.example       # WiFi credentials template
-│   ├── README.md                   # Stage-specific documentation
-│   └── HOME_ASSISTANT_SETUP.md    # HA setup guide
-├── docs/                    # Additional documentation
+├── firmware/               # Latest firmware (compile this!)
+│   ├── firmware.ino              # Main source file
+│   ├── credentials.h.example     # WiFi credentials template
+│   ├── README.md                 # Firmware documentation
+│   └── HOME_ASSISTANT_SETUP.md   # HA setup guide
+├── libs/                   # Archived Arduino libraries
+├── docs/                   # Additional documentation
+├── archive/stages/         # Historical development stages (1-9)
 ├── openspec/               # OpenSpec proposals and specifications
 ├── LICENSE                 # GPL v3 license
 ├── CONTRIBUTING.md         # This file
