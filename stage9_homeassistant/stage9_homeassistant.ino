@@ -1,6 +1,23 @@
 /**
  * ESP32 Microwave Motion Sensor - Stage 9: Home Assistant MQTT Integration
  *
+ * Copyright (C) 2024-2026 Miswired
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * ---
+ *
  * This stage builds on Stage 8 and adds:
  * - MQTT client with PubSubClient library
  * - Home Assistant MQTT Discovery for automatic device registration
@@ -942,6 +959,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <a href="/settings">Settings</a>
       <a href="/diag">Diagnostics</a>
       <a href="/api">API</a>
+      <a href="/about">About</a>
       <a href="#" id="authBtn" style="display:none;">Login</a>
     </div>
   </nav>
@@ -1389,6 +1407,7 @@ const char SETTINGS_HTML[] PROGMEM = R"rawliteral(
       <a href="/settings" class="active">Settings</a>
       <a href="/diag">Diagnostics</a>
       <a href="/api">API</a>
+      <a href="/about">About</a>
       <a href="#" id="authBtn" style="display:none;">Login</a>
     </div>
   </nav>
@@ -2206,6 +2225,7 @@ const char API_HTML[] PROGMEM = R"rawliteral(
       <a href="/settings">Settings</a>
       <a href="/diag">Diagnostics</a>
       <a href="/api" class="active">API</a>
+      <a href="/about">About</a>
       <a href="#" id="authBtn" style="display:none;">Login</a>
     </div>
   </nav>
@@ -2880,6 +2900,7 @@ const char DIAGNOSTICS_HTML[] PROGMEM = R"rawliteral(
       <a href="/settings">Settings</a>
       <a href="/diag" class="active">Diagnostics</a>
       <a href="/api">API</a>
+      <a href="/about">About</a>
       <a href="#" id="authBtn" style="display:none;">Login</a>
     </div>
   </nav>
@@ -3086,6 +3107,162 @@ const char DIAGNOSTICS_HTML[] PROGMEM = R"rawliteral(
     };
 
     checkAuthStatus();
+  </script>
+</body>
+</html>
+)rawliteral";
+
+// ============================================================================
+// ABOUT PAGE HTML
+// ============================================================================
+
+const char ABOUT_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About - ESP32 Radar</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0f; color: #e0e0e0; min-height: 100vh; }
+    nav { background: #1a1a2e; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2a2a4e; }
+    .nav-brand { color: #4a90d9; font-weight: 600; font-size: 18px; text-decoration: none; }
+    .nav-links { display: flex; gap: 20px; }
+    .nav-links a { color: #888; text-decoration: none; font-size: 14px; transition: color 0.2s; }
+    .nav-links a:hover, .nav-links a.active { color: #4a90d9; }
+    .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+    .card { background: #12121a; border-radius: 12px; padding: 25px; margin-bottom: 20px; border: 1px solid #2a2a4e; }
+    h1 { color: #fff; margin-bottom: 20px; font-size: 28px; }
+    h2 { color: #4a90d9; margin-bottom: 15px; font-size: 18px; border-bottom: 1px solid #2a2a4e; padding-bottom: 10px; }
+    .project-header { text-align: center; padding: 30px 0; }
+    .project-title { font-size: 32px; color: #fff; margin-bottom: 10px; }
+    .project-version { color: #4a90d9; font-size: 16px; margin-bottom: 5px; }
+    .project-author { color: #888; font-size: 14px; }
+    .info-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #1a1a2e; }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: #888; }
+    .info-value { color: #e0e0e0; font-family: monospace; }
+    .license-box { background: #1a1a2e; border-radius: 8px; padding: 20px; margin-top: 15px; }
+    .license-title { color: #4a90d9; font-size: 16px; margin-bottom: 10px; }
+    .license-text { color: #aaa; font-size: 13px; line-height: 1.6; }
+    .links { margin-top: 20px; }
+    .links a { display: inline-block; color: #4a90d9; text-decoration: none; margin-right: 20px; font-size: 14px; }
+    .links a:hover { text-decoration: underline; }
+    .footer { text-align: center; padding: 30px; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="nav-brand">ESP32 Radar</a>
+    <div class="nav-links">
+      <a href="/">Dashboard</a>
+      <a href="/settings">Settings</a>
+      <a href="/diag">Diagnostics</a>
+      <a href="/api">API</a>
+      <a href="/about" class="active">About</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="card">
+      <div class="project-header">
+        <div class="project-title">ESP32 Microwave Motion Sensor</div>
+        <div class="project-version">Stage 9: Home Assistant MQTT Integration</div>
+        <div class="project-author">Created by Miswired</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Device Information</h2>
+      <div class="info-row">
+        <span class="info-label">Chip ID</span>
+        <span class="info-value" id="chipId">Loading...</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">IP Address</span>
+        <span class="info-value" id="ipAddress">Loading...</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Uptime</span>
+        <span class="info-value" id="uptime">Loading...</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Free Heap</span>
+        <span class="info-value" id="freeHeap">Loading...</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">WiFi Signal</span>
+        <span class="info-value" id="rssi">Loading...</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>License</h2>
+      <div class="license-box">
+        <div class="license-title">GNU General Public License v3.0</div>
+        <div class="license-text">
+          Copyright &copy; 2024-2026 Miswired<br><br>
+          This program is free software: you can redistribute it and/or modify
+          it under the terms of the GNU General Public License as published by
+          the Free Software Foundation, either version 3 of the License, or
+          (at your option) any later version.<br><br>
+          This program is distributed in the hope that it will be useful,
+          but WITHOUT ANY WARRANTY; without even the implied warranty of
+          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+          GNU General Public License for more details.
+        </div>
+      </div>
+      <div class="links">
+        <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank">Full License Text</a>
+        <a href="https://github.com/miswired/esp32-radar" target="_blank">Source Code</a>
+        <a href="https://github.com/miswired/esp32-radar/wiki" target="_blank">Documentation</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Libraries Used</h2>
+      <div class="info-row">
+        <span class="info-label">ArduinoJson</span>
+        <span class="info-value">MIT License</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">PubSubClient</span>
+        <span class="info-value">MIT License</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">ESP32 Arduino Core</span>
+        <span class="info-value">LGPL-2.1</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    ESP32 Microwave Motion Sensor &bull; GPL-3.0 &bull; Miswired
+  </div>
+
+  <script>
+    async function loadDeviceInfo() {
+      try {
+        const [configRes, diagRes] = await Promise.all([
+          fetch('/config'),
+          fetch('/diagnostics')
+        ]);
+        const config = await configRes.json();
+        const diag = await diagRes.json();
+
+        document.getElementById('chipId').textContent = config.mqttDeviceId || 'N/A';
+        document.getElementById('ipAddress').textContent = config.ipAddress || 'N/A';
+        document.getElementById('uptime').textContent = diag.uptimeFormatted || 'N/A';
+        document.getElementById('freeHeap').textContent = diag.freeHeap ? diag.freeHeap.toLocaleString() + ' bytes' : 'N/A';
+        document.getElementById('rssi').textContent = diag.rssi ? diag.rssi + ' dBm' : 'N/A';
+      } catch (err) {
+        console.error('Failed to load device info:', err);
+      }
+    }
+
+    loadDeviceInfo();
+    setInterval(loadDeviceInfo, 10000);
   </script>
 </body>
 </html>
@@ -4081,6 +4258,10 @@ void handleDiagPage() {
   server.send_P(200, "text/html", DIAGNOSTICS_HTML);
 }
 
+void handleAbout() {
+  server.send_P(200, "text/html", ABOUT_HTML);
+}
+
 void handleStatus() {
   // GET endpoints are not protected - allows web UI to function
   JsonDocument doc;
@@ -4922,6 +5103,7 @@ void setupWebServer() {
   server.on("/settings", HTTP_GET, handleSettings);
   server.on("/diag", HTTP_GET, handleDiagPage);
   server.on("/api", HTTP_GET, handleApi);
+  server.on("/about", HTTP_GET, handleAbout);
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/config", HTTP_GET, handleGetConfig);
   server.on("/config", HTTP_POST, handlePostConfig);

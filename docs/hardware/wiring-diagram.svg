@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 450" width="700" height="450">
+  <defs>
+    <style>
+      .board { fill: #1a1a2e; stroke: #4a4a6e; stroke-width: 2; }
+      .board-label { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; fill: #ffffff; }
+      .pin { fill: #ffd700; stroke: #b8860b; stroke-width: 1; }
+      .pin-label { font-family: monospace; font-size: 11px; fill: #cccccc; }
+      .pin-sublabel { font-family: Arial, sans-serif; font-size: 9px; fill: #888888; }
+      .wire-power { stroke: #ff4444; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+      .wire-ground { stroke: #555555; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+      .wire-signal { stroke: #44dd44; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+      .wire-label { font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; }
+      .junction { fill: #ffffff; }
+      .usb { fill: #333333; stroke: #555555; stroke-width: 1; }
+      .usb-label { font-family: Arial, sans-serif; font-size: 9px; fill: #888888; }
+      .chip { fill: #222222; stroke: #444444; stroke-width: 1; }
+      .legend { font-family: Arial, sans-serif; font-size: 11px; fill: #cccccc; }
+      .legend-title { font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; fill: #ffffff; }
+      .title { font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; fill: #ffffff; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 12px; fill: #888888; }
+      .note { font-family: Arial, sans-serif; font-size: 10px; fill: #666666; font-style: italic; }
+      .nc-pin { fill: #444444; stroke: #333333; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="700" height="450" fill="#0a0a0f"/>
+
+  <!-- Title -->
+  <text x="350" y="32" text-anchor="middle" class="title">ESP32 + RCWL-0516 Wiring Diagram</text>
+  <text x="350" y="52" text-anchor="middle" class="subtitle">Microwave Motion Sensor - 3 Wire Connection</text>
+
+  <!-- ==================== ESP32 BOARD ==================== -->
+  <rect x="40" y="80" width="160" height="260" rx="8" class="board"/>
+  <text x="120" y="105" text-anchor="middle" class="board-label">ESP32 DevKit</text>
+
+  <!-- ESP32 USB Port -->
+  <rect x="90" y="310" width="60" height="25" rx="3" class="usb"/>
+  <text x="120" y="327" text-anchor="middle" class="usb-label">USB (5V Power)</text>
+
+  <!-- ESP32 Chip representation -->
+  <rect x="70" y="150" width="100" height="70" rx="3" class="chip"/>
+  <text x="120" y="190" text-anchor="middle" style="font-family: monospace; font-size: 9px; fill: #555555;">ESP32-WROOM</text>
+
+  <!-- ESP32 Pins - Right Side (used pins only, vertically spaced for wire routing) -->
+  <!-- VIN Pin -->
+  <circle cx="185" cy="130" r="6" class="pin"/>
+  <text x="155" y="125" class="pin-label">VIN</text>
+  <text x="155" y="138" class="pin-sublabel">(5V in)</text>
+
+  <!-- GND Pin -->
+  <circle cx="185" cy="180" r="6" class="pin"/>
+  <text x="155" y="184" class="pin-label">GND</text>
+
+  <!-- GPIO13 Pin -->
+  <circle cx="185" cy="230" r="6" class="pin"/>
+  <text x="140" y="234" class="pin-label">GPIO13</text>
+
+  <!-- GPIO2 LED indicator (not connected externally) -->
+  <circle cx="55" cy="280" r="5" class="pin"/>
+  <text x="70" y="275" class="pin-label">GPIO2</text>
+  <text x="70" y="288" class="pin-sublabel">(Built-in LED)</text>
+
+  <!-- ==================== RCWL-0516 BOARD ==================== -->
+  <rect x="480" y="100" width="180" height="180" rx="8" class="board"/>
+  <text x="570" y="125" text-anchor="middle" class="board-label">RCWL-0516</text>
+  <text x="570" y="142" text-anchor="middle" class="pin-sublabel">Microwave Radar Sensor</text>
+
+  <!-- RCWL-0516 Antenna Pattern -->
+  <rect x="510" y="155" width="120" height="70" rx="4" fill="none" stroke="#3a3a5e" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="570" y="195" text-anchor="middle" style="font-size: 10px; fill: #555555;">Antenna Area</text>
+
+  <!-- RCWL-0516 Pins - Left Side (facing ESP32 for clean routing) -->
+  <!-- VIN Pin -->
+  <circle cx="495" cy="130" r="6" class="pin"/>
+  <text x="510" y="134" class="pin-label">VIN</text>
+
+  <!-- GND Pin -->
+  <circle cx="495" cy="180" r="6" class="pin"/>
+  <text x="510" y="184" class="pin-label">GND</text>
+
+  <!-- OUT Pin -->
+  <circle cx="495" cy="230" r="6" class="pin"/>
+  <text x="510" y="234" class="pin-label">OUT</text>
+
+  <!-- 3V3 Pin (Not Connected) -->
+  <circle cx="495" cy="260" r="5" class="nc-pin"/>
+  <text x="510" y="264" style="font-family: monospace; font-size: 10px; fill: #666666;">3V3</text>
+  <text x="540" y="264" class="note">(not used)</text>
+
+  <!-- ==================== WIRES - Orthogonal routing, no overlaps ==================== -->
+
+  <!-- Wire 1: Power (Red) - ESP32 VIN to RCWL VIN -->
+  <path d="M 191 130 L 489 130" class="wire-power"/>
+  <circle cx="191" cy="130" r="4" class="junction"/>
+  <circle cx="489" cy="130" r="4" class="junction"/>
+  <rect x="310" y="118" width="60" height="18" rx="3" fill="#1a1a2e"/>
+  <text x="340" y="131" text-anchor="middle" class="wire-label" fill="#ff4444">5V Power</text>
+
+  <!-- Wire 2: Ground (Gray) - ESP32 GND to RCWL GND -->
+  <path d="M 191 180 L 489 180" class="wire-ground"/>
+  <circle cx="191" cy="180" r="4" class="junction"/>
+  <circle cx="489" cy="180" r="4" class="junction"/>
+  <rect x="310" y="168" width="60" height="18" rx="3" fill="#1a1a2e"/>
+  <text x="340" y="181" text-anchor="middle" class="wire-label" fill="#888888">Ground</text>
+
+  <!-- Wire 3: Signal (Green) - ESP32 GPIO13 to RCWL OUT -->
+  <path d="M 191 230 L 489 230" class="wire-signal"/>
+  <circle cx="191" cy="230" r="4" class="junction"/>
+  <circle cx="489" cy="230" r="4" class="junction"/>
+  <rect x="315" y="218" width="50" height="18" rx="3" fill="#1a1a2e"/>
+  <text x="340" y="231" text-anchor="middle" class="wire-label" fill="#44dd44">Signal</text>
+
+  <!-- ==================== LEGEND ==================== -->
+  <rect x="40" y="360" width="280" height="75" rx="6" fill="#12121a" stroke="#2a2a4e"/>
+  <text x="180" y="382" text-anchor="middle" class="legend-title">Wire Color Legend</text>
+
+  <!-- Red wire -->
+  <line x1="60" y1="400" x2="100" y2="400" class="wire-power"/>
+  <circle cx="60" cy="400" r="3" class="junction"/>
+  <text x="110" y="404" class="legend">Red = Power (5V)</text>
+
+  <!-- Gray wire -->
+  <line x1="60" y1="418" x2="100" y2="418" class="wire-ground"/>
+  <circle cx="60" cy="418" r="3" class="junction"/>
+  <text x="110" y="422" class="legend">Gray = Ground</text>
+
+  <!-- Green wire -->
+  <line x1="170" y1="418" x2="210" y2="418" class="wire-signal"/>
+  <circle cx="170" cy="418" r="3" class="junction"/>
+  <text x="220" y="422" class="legend">Green = Signal</text>
+
+  <!-- ==================== CONNECTION TABLE ==================== -->
+  <rect x="340" y="360" width="320" height="75" rx="6" fill="#12121a" stroke="#2a2a4e"/>
+  <text x="500" y="382" text-anchor="middle" class="legend-title">Connection Summary</text>
+
+  <text x="360" y="402" class="legend">1.</text>
+  <text x="380" y="402" style="font-family: monospace; font-size: 11px; fill: #ff6666;">ESP32 VIN</text>
+  <text x="462" y="402" class="legend">→</text>
+  <text x="478" y="402" style="font-family: monospace; font-size: 11px; fill: #ff6666;">RCWL VIN</text>
+  <text x="565" y="402" class="note">(power)</text>
+
+  <text x="360" y="418" class="legend">2.</text>
+  <text x="380" y="418" style="font-family: monospace; font-size: 11px; fill: #aaaaaa;">ESP32 GND</text>
+  <text x="462" y="418" class="legend">→</text>
+  <text x="478" y="418" style="font-family: monospace; font-size: 11px; fill: #aaaaaa;">RCWL GND</text>
+  <text x="565" y="418" class="note">(ground)</text>
+
+  <text x="360" y="434" class="legend">3.</text>
+  <text x="380" y="434" style="font-family: monospace; font-size: 11px; fill: #44dd44;">ESP32 GPIO13</text>
+  <text x="462" y="434" class="legend">→</text>
+  <text x="478" y="434" style="font-family: monospace; font-size: 11px; fill: #44dd44;">RCWL OUT</text>
+  <text x="565" y="434" class="note">(signal)</text>
+
+</svg>
