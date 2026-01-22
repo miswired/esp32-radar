@@ -44,8 +44,10 @@ See [Wiring Guide](docs/hardware/WIRING.md) for detailed instructions.
 
 2. **Install dependencies**
    ```bash
-   arduino-cli lib install ArduinoJson PubSubClient
+   arduino-cli lib install ArduinoJson@7.4.2 PubSubClient@2.8
    ```
+
+   Alternatively, use the archived libraries in [libs/](libs/) for offline installation.
 
 3. **Configure WiFi credentials**
    ```bash
@@ -102,6 +104,7 @@ When connected via MQTT, the following entities are created:
 ```
 esp32-radar/
 ├── stage9_homeassistant/   # Latest firmware with all features
+├── libs/                   # Archived Arduino libraries
 ├── docs/                   # Additional documentation
 │   └── hardware/          # BOM and wiring guides
 ├── openspec/              # Feature specifications
